@@ -8,8 +8,8 @@ IDLE_OFF_MIN=15
 INPUT_KEYPAD=""           # auto-detected at install if empty
 INPUT_POWER=""            # auto-detected at install if empty
 A2DP_SINK_PROP="bluetooth.profile.a2dp.sink.enabled"
-GESTURE_PAIR_HOLD_MS=3000
-GESTURE_MODE_HOLD_MS=5000
-DOUBLE_TAP_WINDOW_MS=300
+GESTURE_PAIR_HOLD_MS=1500     # both volumes held this long = pairing window
+GESTURE_MODE_HOLD_MS=5000     # power + vol-down held this long = mode toggle (->full)
+DOUBLE_TAP_WINDOW_MS=300      # also the delayed-volume decode delay (defer single tap this long)
 POWER_SHORT_MS=600           # power tap (<this) = play/pause; hold (>=this) = normal power
 CUE_VOLUME_PCT=50
