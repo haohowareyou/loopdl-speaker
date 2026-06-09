@@ -6,10 +6,13 @@
 . /data/adb/loop-speaker-mode/scripts/lib.sh
 
 BIN=/data/adb/modules/loop-speaker-mode/system/bin/loopkeyd
+# Daemon logs gesture detection to stdout; capture it so button gestures are
+# debuggable (truncated on each (re)launch to stay small).
+DLOG="$LOOP_DIR/loopkeyd.log"
 
 while true; do
   if [ "$(cat "$STATE" 2>/dev/null)" = dumb ]; then
-    "$BIN" || loop_log "loopkeyd exited $?"
+    "$BIN" >"$DLOG" 2>&1 || loop_log "loopkeyd exited $?"
   fi
   sleep 2
 done

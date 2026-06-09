@@ -390,6 +390,7 @@ int main(int argc, char **argv) {
     int pending_dbl = 0;        /* a volume key awaiting its second tap */
     int pending_code = 0;       /* which volume key is pending */
     int pwr_passthrough = 0;    /* grab released on power fd for power menu */
+    int pwr_consumed = 0;       /* power was part of a combo -> no play_pause on release */
 
     while (running) {
         struct epoll_event evs[8 + MAX_DEVS];
@@ -411,7 +412,10 @@ int main(int argc, char **argv) {
             }
             if (tag == TAG_T_PAIR) {
                 drain_timer(t_pair);
-                if (vup_down && vdn_down) {
+                /* pair = BOTH volumes for pair_hold_ms with power UP. If power is
+                 * also down this is the mode-toggle combo forming (pair is a prefix
+                 * of mode); let t_mode handle it instead of firing pairing here. */
+                if (vup_down && vdn_down && !pwr_down) {
                     emit("pair_open");
                     /* consume: cancel any pending single/double for these keys */
                     pending_dbl = 0;
@@ -420,7 +424,10 @@ int main(int argc, char **argv) {
             }
             if (tag == TAG_T_MODE) {
                 drain_timer(t_mode);
-                if (vup_down && vdn_down && pwr_down) emit("mode_toggle");
+                if (vup_down && vdn_down && pwr_down) {
+                    emit("mode_toggle");
+                    pwr_consumed = 1;  /* don't fire play_pause when power is released */
+                }
                 continue;
             }
             if (tag == TAG_T_PWR) {
@@ -499,6 +506,10 @@ int main(int argc, char **argv) {
                             if (!dry_run) ioctl(devs[power_idx], EVIOCGRAB, 1);
                             pwr_passthrough = 0;
                             logln("power released: re-grabbed");
+                        } else if (pwr_consumed) {
+                            /* power was part of the mode-toggle combo, not a tap */
+                            timer_disarm(t_pwr);
+                            pwr_consumed = 0;
                         } else {
                             /* released before long-press fired -> short press */
                             timer_disarm(t_pwr);
