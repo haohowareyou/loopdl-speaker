@@ -1,0 +1,3 @@
+co.rainx.loop.launcher
+co.rainx.loop.setup
+vendor.rainx.setupwizard.overlay

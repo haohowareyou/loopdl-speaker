@@ -6,6 +6,7 @@ snapshot-*/
 *settings-*.txt
 *esim*.txt
 *packages-*.txt
+!magisk-module/scripts/packages-*.txt
 
 # ── Never redistribute firmware (copyright rainx / OEM) ──
 *.img
