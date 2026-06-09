@@ -20,4 +20,8 @@ loop_set_radio() { # loop_set_radio wifi on|off ; loop_set_radio data on|off
   esac
 }
 
-loop_pm() { pm "$1" --user 0 "$2" >/dev/null 2>&1; }  # $1=disable-user|enable
+# $1=disable-user|enable. </dev/null is REQUIRED: callers run this inside
+# `while read p; do loop_pm ... done < file` loops, and pm (via `cmd package`)
+# reads stdin — without it pm swallows the rest of the file and the loop dies
+# after the first package (silently masked in dumb mode since pkgs start disabled).
+loop_pm() { pm "$1" --user 0 "$2" >/dev/null 2>&1 </dev/null; }

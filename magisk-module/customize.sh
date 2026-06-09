@@ -1,6 +1,11 @@
 #!/system/bin/sh
 LOOP_DIR=/data/adb/loop-speaker-mode
 mkdir -p "$LOOP_DIR"
+# Clean-sync the runtime scripts. `cp -af src dest` when dest already exists copies
+# src *into* dest (creating dest/scripts/…) instead of overwriting, so on reinstall the
+# runtime scripts (which loop-*.sh source lib.sh from by absolute path) would otherwise
+# go stale. Remove first, then copy.
+rm -rf "$LOOP_DIR/scripts"
 cp -af "$MODPATH/scripts" "$LOOP_DIR/scripts"
 [ -f "$LOOP_DIR/config" ] || cp -f "$MODPATH/config.default" "$LOOP_DIR/config"
 
