@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec adb shell su -c "sh /data/adb/loop-speaker-mode/scripts/loop-mode ${1:-status}"
