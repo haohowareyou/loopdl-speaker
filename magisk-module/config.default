@@ -11,4 +11,5 @@ A2DP_SINK_PROP="bluetooth.profile.a2dp.sink.enabled"
 GESTURE_PAIR_HOLD_MS=3000
 GESTURE_MODE_HOLD_MS=5000
 DOUBLE_TAP_WINDOW_MS=300
+POWER_SHORT_MS=600           # power tap (<this) = play/pause; hold (>=this) = normal power
 CUE_VOLUME_PCT=50

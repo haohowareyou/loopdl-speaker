@@ -3,6 +3,10 @@
 loop_load_config
 loop_log "entering FULL mode"
 
+# release the button grab so phone buttons are normal in full mode;
+# the supervisor (loopkeyd.sh) relaunches the daemon when state flips to dumb.
+pkill -TERM loopkeyd 2>/dev/null
+
 # permanent rainx: STILL disabled even in full mode (privacy guarantee)
 while read -r p; do [ -n "$p" ] && loop_pm disable-user "$p"; done < "$(dirname "$0")/packages-permanent-disable.txt"
 # toggled: re-enable for full phone use
