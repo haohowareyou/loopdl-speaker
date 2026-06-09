@@ -27,6 +27,10 @@ settings put secure bluetooth_name "$DEVICE_NAME"
 # Also clear "stay awake while plugged in" — a speaker is usually on a charger, and
 # that developer setting (if on) would otherwise keep the panel lit indefinitely.
 settings put global stay_on_while_plugged_in 0
+# Disable double-tap-to-wake: it keeps the touch digitizer in a low-power gesture-scan
+# mode while the screen is off (extra battery + accidental wakes). A dumb speaker never
+# takes screen input, so let the digitizer fully sleep. Restored in full mode.
+settings put secure double_tap_to_wake 0
 settings put system screen_off_timeout 10000
 input keyevent 223   # KEYCODE_SLEEP
 

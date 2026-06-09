@@ -23,5 +23,6 @@ loop_set_radio wifi on
 loop_set_radio data on
 
 settings put system screen_off_timeout 120000
+settings put secure double_tap_to_wake 1   # restore normal-phone tap-to-wake
 loop_app mode_full
 loop_log "FULL applied"

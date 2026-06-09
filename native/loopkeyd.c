@@ -20,16 +20,17 @@
  * "both volumes held" work even when the events arrive on different fds.
  *
  * Gestures (thresholds read from config, defaults below):
- *   vol+/vol- single tap        -> re-inject (volume) after DOUBLE_TAP_WINDOW_MS decode delay
+ *   vol+/vol- single tap        -> re-inject volume INSTANTLY (no added latency)
  *   vol+/vol- double tap        -> "next" / "prev"   (within DOUBLE_TAP_WINDOW_MS)
  *   power short press (<600ms)   -> "play_pause"
  *   power long press (no vol)    -> release grab on power fd / pass through
  *   both volumes held            -> "pair_open"   (GESTURE_PAIR_HOLD_MS)
  *   power + vol-down held        -> "mode_toggle" (GESTURE_MODE_HOLD_MS)  [-> full mode]
  *
- * Volume is decoded with a short delay (DOUBLE_TAP_WINDOW_MS): on the first press we
- * do NOT act, so that a second key (other volume = combo, or same key = double tap)
- * can be recognised first. A lone press fires the volume nudge when the window expires.
+ * Volume nudges fire immediately on press. A double tap of the same key also skips a
+ * track (so a quick double registers as volume+volume+skip). Combos (pair/mode) are
+ * detected by HOLD timers armed when the keys go down, independent of press order, and
+ * they cancel the pending double-tap when they win.
  *
  * Key codes: KEY_VOLUMEUP=115, KEY_VOLUMEDOWN=114, KEY_POWER=116.
  *
@@ -208,7 +209,7 @@ static int collect_button_devs(int *devs, char dev_names[][128], int *power_idx)
             if (strncmp(e->d_name, "event", 5) != 0) continue;
             char path[64];
             snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
-            int fd = open(path, O_RDONLY);
+            int fd = open(path, O_RDONLY | O_NONBLOCK);
             if (fd < 0) continue;
             char name[128] = "";
             ioctl(fd, EVIOCGNAME(sizeof(name)), name);
@@ -408,14 +409,9 @@ int main(int argc, char **argv) {
 
             if (tag == TAG_T_DBL) {
                 drain_timer(t_dbl);
-                /* decode window closed with no second key: a lone volume tap.
-                 * Re-inject the nudge now (delayed-volume). */
-                if (vol_pending) {
-                    if (!dry_run && ufd >= 0) uinput_tap(ufd, vol_pending);
-                    else logln("dry: reinject %s",
-                               vol_pending == KEY_VOLUMEUP ? "VOLUP" : "VOLDOWN");
-                    vol_pending = 0;
-                }
+                /* double-tap window closed: it was a single tap. Volume was already
+                 * nudged instantly on press, so just clear the pending state. */
+                vol_pending = 0;
                 continue;
             }
             if (tag == TAG_T_PAIR) {
@@ -472,26 +468,34 @@ int main(int argc, char **argv) {
                     if (pressed) {
                         int other_down = is_up ? vdn_down : vup_down;
                         if (is_up) vup_down = 1; else vdn_down = 1;
+                        logln("key %s down", is_up ? "VOLUP" : "VOLDN");
 
                         if (other_down) {
-                            /* both volumes down -> pair/mode combo candidate.
-                             * Cancel any pending single-volume decode. */
+                            /* both volumes down -> pair window; if power is also down,
+                             * it's the mode combo instead (armed below / in power press). */
                             vol_pending = 0;
                             timer_disarm(t_dbl);
                             timer_arm(t_pair, pair_hold_ms);
                             if (pwr_down) timer_arm(t_mode, mode_hold_ms);
-                        } else if (vol_pending == ie.code) {
-                            /* second tap of the same key within the window -> next/prev */
-                            emit(is_up ? "next" : "prev");
-                            vol_pending = 0;
-                            timer_disarm(t_dbl);
                         } else {
-                            /* first press: defer. Decode on t_dbl expiry or a 2nd key. */
-                            vol_pending = ie.code;
-                            timer_arm(t_dbl, double_tap_ms);
+                            /* INSTANT volume: nudge now so volume never lags. */
+                            if (!dry_run && ufd >= 0) uinput_tap(ufd, ie.code);
+                            logln("reinject %s", is_up ? "VOLUP" : "VOLDN");
+                            /* double tap of same key within window -> next/prev */
+                            if (vol_pending == ie.code) {
+                                emit(is_up ? "next" : "prev");
+                                vol_pending = 0;
+                                timer_disarm(t_dbl);
+                            } else {
+                                vol_pending = ie.code;
+                                timer_arm(t_dbl, double_tap_ms);
+                            }
+                            /* power + vol-down (EITHER press order) -> mode combo */
+                            if (!is_up && pwr_down) timer_arm(t_mode, mode_hold_ms);
                         }
                     } else { /* released */
                         if (is_up) vup_down = 0; else vdn_down = 0;
+                        logln("key %s up", is_up ? "VOLUP" : "VOLDN");
                         if (!(vup_down && vdn_down)) {
                             timer_disarm(t_pair);
                         }
@@ -503,10 +507,12 @@ int main(int argc, char **argv) {
                     if (pressed) {
                         pwr_down = 1;
                         pwr_long = 0;
+                        logln("key POWER down");
                         timer_arm(t_pwr, power_short_ms);
                         if (vdn_down && !vup_down) timer_arm(t_mode, mode_hold_ms);
                     } else { /* released */
                         pwr_down = 0;
+                        logln("key POWER up");
                         timer_disarm(t_mode);
                         if (pwr_passthrough) {
                             if (!dry_run) ioctl(devs[power_idx], EVIOCGRAB, 1);

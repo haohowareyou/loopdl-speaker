@@ -7,11 +7,11 @@ case "$1" in
   play_pause|next|prev|pair_open|battery)
     loop_app "$1" ;;
   mode_toggle)
-    if [ "$(cat "$STATE" 2>/dev/null)" = dumb ]; then
-      sh "$(dirname "$0")/loop-mode" full
-    else
-      sh "$(dirname "$0")/loop-mode" dumb
-    fi ;;
+    # Route the switch through the IPC poller (loop-ipc.sh, u:r:magisk:s0) instead of
+    # running loop-mode here. This script is invoked by the native daemon, whose exec
+    # context can run `pm` but is DENIED the `svc`/`settings` binder calls — so radios
+    # and screen policy silently fail to toggle. The poller's context has that access.
+    : > "$LOOP_DIR/req_toggle" ;;
   *)
     loop_log "loop-act: unknown action '$1'" ;;
 esac

@@ -18,6 +18,20 @@ APPF=/data/data/co.loop.speaker/files
 while true; do
   state=$(cat "$STATE" 2>/dev/null)
 
+  # mode toggle from the native daemon (Power+Vol-Down). The daemon can't run the
+  # svc/settings calls in loop-mode from its own exec context, so it drops req_toggle
+  # here and we run it in this (u:r:magisk:s0) context where those calls succeed.
+  if [ -f "$LOOP_DIR/req_toggle" ]; then
+    rm -f "$LOOP_DIR/req_toggle"
+    if [ "$state" = dumb ]; then
+      loop_log "ipc: toggle -> full"
+      sh "$LOOP_DIR/scripts/loop-mode" full
+    else
+      loop_log "ipc: toggle -> dumb"
+      sh "$LOOP_DIR/scripts/loop-mode" dumb
+    fi
+  fi
+
   # full -> dumb (QS tile). Only meaningful when not already dumb.
   if [ -f "$APPF/req_dumb" ]; then
     rm -f "$APPF/req_dumb"
@@ -40,5 +54,5 @@ while true; do
     fi
   fi
 
-  sleep 2
+  sleep 1
 done
