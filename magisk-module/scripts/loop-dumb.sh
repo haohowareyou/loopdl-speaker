@@ -14,8 +14,11 @@ while read -r p; do [ -n "$p" ] && loop_pm disable-user "$p"; done < "$(dirname 
 loop_set_radio nfc off
 settings put secure location_mode 0
 
-# bt name + screen policy
+# bt name + screen policy. The advertised Bluetooth name is secure/bluetooth_name
+# (global/device_name alone does NOT rename the adapter); set both. Applied by the BT
+# stack on its next init (i.e. from the next boot) — harmless to re-set every dumb entry.
 settings put global device_name "$DEVICE_NAME"
+settings put secure bluetooth_name "$DEVICE_NAME"
 settings put system screen_off_timeout 15000
 
 echo dumb > "$STATE"

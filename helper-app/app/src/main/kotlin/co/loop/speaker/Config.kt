@@ -12,7 +12,7 @@ object Config {
     private const val PATH = "/data/adb/loop-speaker-mode/config"
 
     // Defaults match config.default in the magisk module
-    var PAIR_INITIAL: Int = 120
+    var PAIR_INITIAL: Int = 180
     var PAIR_RETRIGGER: Int = 60
     var CUE_VOLUME_PCT: Int = 50
     var IDLE_SLEEP_MIN: Int = 5

@@ -49,12 +49,18 @@ echo "[build-app] using apksigner: $APKSIGNER"
 
 # Sign and output directly into the module tree
 mkdir -p "$OUT_DIR"
+# --v4-signing-enabled false: do NOT emit a .idsig. APK Signature Scheme v4 requires
+# fs-verity on the file, which Magisk's tmpfs/overlay (/system/priv-app) does not support
+# — PackageManager then fails cert collection ("Failed to measure fs-verity, errno 13")
+# and silently skips the whole package. v2/v3 (always on) need no fs-verity.
 "$APKSIGNER" sign \
   --ks debug.keystore \
   --ks-pass pass:android \
   --key-pass pass:android \
+  --v4-signing-enabled false \
   --out "$OUT_DIR/LoopSpeaker.apk" \
   "$APK"
+rm -f "$OUT_DIR/LoopSpeaker.apk.idsig"
 
 echo "[build-app] done → $OUT_DIR/LoopSpeaker.apk"
 ls -lh "$OUT_DIR/LoopSpeaker.apk"

@@ -40,6 +40,7 @@ class LoopService : Service() {
     private lateinit var reconnect: Reconnect
     private lateinit var idleSleep: IdleSleep
     private lateinit var volume: Volume
+    private var ready = false
 
     // A2DP connect/disconnect events poke idle timer and trigger cues
     private val a2dpReceiver = object : BroadcastReceiver() {
@@ -62,7 +63,17 @@ class LoopService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "service create")
-        startForeground(NOTIF_ID, buildNotif())
+        try {
+            startForeground(NOTIF_ID, buildNotif())
+        } catch (e: Exception) {
+            // A connectedDevice foreground service requires a *granted* runtime BT
+            // permission. On a fresh install the module's service.sh grants them, but
+            // BootReceiver may start us first. Bail cleanly instead of crash-looping;
+            // service.sh grants the perms and re-triggers us.
+            Log.w(TAG, "startForeground failed (BT perms not granted yet?): ${e.message}")
+            stopSelf()
+            return
+        }
 
         Config.load()
 
@@ -81,9 +92,11 @@ class LoopService : Service() {
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         }
         registerReceiver(a2dpReceiver, filter, RECEIVER_EXPORTED)
+        ready = true
     }
 
     override fun onStartCommand(i: Intent?, flags: Int, startId: Int): Int {
+        if (!ready) return START_NOT_STICKY
         i?.getStringExtra("cmd")?.let { cmd ->
             dispatch(cmd, i.getStringExtra("arg"))
         }
@@ -129,10 +142,12 @@ class LoopService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        try { unregisterReceiver(a2dpReceiver) } catch (_: Exception) {}
-        pairing.close()
-        idleSleep.stop()
-        cues.shutdown()
+        if (ready) {
+            try { unregisterReceiver(a2dpReceiver) } catch (_: Exception) {}
+            pairing.close()
+            idleSleep.stop()
+            cues.shutdown()
+        }
         Log.i(TAG, "service destroy")
     }
 
