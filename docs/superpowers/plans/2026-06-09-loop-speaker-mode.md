@@ -63,6 +63,40 @@ loopdl-speaker/
 
 ---
 
+# PHASE 0 — Recovery / brick insurance (do FIRST)
+
+The module itself writes no partitions and is removable via Magisk Safe Mode, so build risk is low. This phase exists so that even a catastrophic, unrelated failure is recoverable. BROM being wide-open means every partition can be *written* back over USB — we just need *images* to write.
+
+### Task 0: Critical-partition raw backup
+
+**Files:** none in repo (images are personal/firmware → gitignored, stored under `loop-backup/partitions-<date>/`).
+
+- [ ] **Step 1: Put device in preloader mode** — power fully OFF, then plug USB with **NO buttons held** (preloader supplies DRAM/EMI config; BROM mode would hang stage-2 — the known gotcha).
+
+- [ ] **Step 2: Read the small critical partitions** (skip `super`/`userdata` — huge + personal). Reuse the working mtkclient venv:
+```bash
+cd ~/Documents/Claude/personal/loopdl/mtkclient
+mkdir -p ../loop-backup/partitions-2026-06-09
+for P in preloader_a preloader_b lk_a lk_b boot_a boot_b init_boot_a init_boot_b \
+         vbmeta_a vbmeta_b vbmeta_system_a vbmeta_system_b vbmeta_vendor_a vbmeta_vendor_b \
+         seccfg nvram nvdata nvcfg protect1 protect2 persist md1img_a md1img_b; do
+  ./venv/bin/python mtk.py r "$P" "../loop-backup/partitions-2026-06-09/$P.img" || echo "skip $P"
+done
+```
+(Names per the 62-partition GPT already dumped; `|| echo skip` tolerates slot/name variance.)
+
+- [ ] **Step 3: Verify** — every expected `.img` exists and is non-zero:
+```bash
+ls -lh ../loop-backup/partitions-2026-06-09/ | awk '$5=="0"{print "EMPTY:",$9}'
+```
+Expected: no `EMPTY:` lines. Confirm `init_boot_a.img` matches the known stock (`cmp` vs `rooting/stock-firmware/init_boot_a.img`) — sanity that the read is real.
+
+- [ ] **Step 4: Record a one-line restore recipe** in `docs/recovery.md` (written in Task 18): `mtk.py w <partition> loop-backup/partitions-2026-06-09/<partition>.img` in preloader mode restores any single partition.
+
+- [ ] **Step 5:** confirm `loop-backup/partitions-*/` is gitignored (it is: `loop-backup/` + `*.img` rules). Do NOT commit images.
+
+---
+
 # PHASE 1 — Module foundation (shell, no app/daemon yet)
 
 End state: a flashable zip that on boot applies Dumb policy (radios, packages, screen) and supports `loop-mode dumb|full|status` over adb. No buttons/app yet. Fully testable.
