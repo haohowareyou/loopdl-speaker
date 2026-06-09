@@ -1,0 +1,25 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="co.loop.speaker">
+  <permission android:name="co.loop.speaker.CONTROL" android:protectionLevel="signature"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED"/>
+  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <application android:label="Loop Speaker" android:persistent="true">
+    <service android:name=".LoopService" android:exported="true"
+             android:foregroundServiceType="connectedDevice"
+             android:permission="co.loop.speaker.CONTROL"/>
+    <receiver android:name=".CmdReceiver" android:exported="true"
+              android:permission="co.loop.speaker.CONTROL">
+      <intent-filter><action android:name="co.loop.speaker.CMD"/></intent-filter>
+    </receiver>
+    <receiver android:name=".BootReceiver" android:exported="true">
+      <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter>
+    </receiver>
+  </application>
+</manifest>

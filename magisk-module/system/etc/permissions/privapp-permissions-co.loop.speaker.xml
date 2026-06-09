@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<permissions>
+  <privapp-permissions package="co.loop.speaker">
+    <permission name="android.permission.BLUETOOTH_PRIVILEGED"/>
+    <permission name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+  </privapp-permissions>
+</permissions>
