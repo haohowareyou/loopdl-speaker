@@ -17,7 +17,7 @@ import android.util.Log
  * high), bucketed to tens so a continuous ramp doesn't rebuild the ToneGenerator
  * on every single step.
  */
-class Tick(val ctx: Context) {
+class Tick(val ctx: Context, val onVolume: () -> Unit = {}, val onEdge: () -> Unit = {}) {
     private val am = ctx.getSystemService(AudioManager::class.java)
     private var registered = false
     private var tg: ToneGenerator? = null
@@ -31,6 +31,11 @@ class Tick(val ctx: Context) {
             val v = i.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
             val prev = i.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
             if (v < 0 || v == prev) return
+            onVolume()   // warm the amp so this tick (cold-amp/standby) is audible
+            // At the rails, play the distinct "limit" earcon instead of a normal step pip so
+            // you know — with no screen — that you've topped out / bottomed out.
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            if (v >= max || v <= 0) { onEdge(); return }
             play(v)
         }
     }

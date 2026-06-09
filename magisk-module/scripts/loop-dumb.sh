@@ -44,6 +44,12 @@ done
 settings put secure wake_gesture_enabled 0   # lift/tilt-to-check wake
 settings put secure doze_enabled 0           # ambient display pulses
 settings put system sound_effects_enabled 0  # volume feedback is app-played (Tick); no system click
+# Silence notifications/ringtones in speaker mode (no screen to read them, and they
+# barge over music). INTERRUPTION_FILTER_ALARMS mutes notifications + ringer but still
+# lets ALARM-usage audio through — and the app's TTS cues are USAGE_ALARM, so spoken
+# cues ("Connected", "Pairing") still sound. zen state persists across reboot; restored
+# to "off" in full mode. Run from this (root) context where cmd notification succeeds.
+cmd notification set_dnd alarms 2>/dev/null
 settings put system screen_off_timeout 10000
 input keyevent 223   # KEYCODE_SLEEP
 

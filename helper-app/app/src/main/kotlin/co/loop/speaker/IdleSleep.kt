@@ -24,16 +24,23 @@ import java.io.File
  *
  * Never fires while AudioManager.isMusicActive() is true.
  */
-class IdleSleep(val ctx: Context, val sleepMin: Int, val offMin: Int) {
+class IdleSleep(
+    val ctx: Context,
+    val sleepMin: Int,
+    val offMin: Int,
+    val onPreOff: () -> Unit = {},
+) {
     private val h = Handler(Looper.getMainLooper())
     private var last = SystemClock.elapsedRealtime()
     private val am = ctx.getSystemService(AudioManager::class.java)
     private var running = false
     private var sleeping = false
+    private var preOffWarned = false
 
     fun poke() {
         last = SystemClock.elapsedRealtime()
         sleeping = false
+        preOffWarned = false
     }
 
     /** Drop a trigger file in filesDir for the root IPC poller (loop-ipc.sh) to execute. */
@@ -71,6 +78,13 @@ class IdleSleep(val ctx: Context, val sleepMin: Int, val offMin: Int) {
                     idleMin >= offMin -> {
                         Log.i("LoopSpk", "idle->poweroff idleMin=$idleMin")
                         signalRoot("req_poweroff")
+                    }
+                    idleMin >= offMin - 1 && !preOffWarned -> {
+                        // ~1 min before auto-off: warn so a button tap (which poke()s) can
+                        // keep the device alive instead of it powering off silently.
+                        Log.i("LoopSpk", "idle->preoff-warn idleMin=$idleMin")
+                        onPreOff()
+                        preOffWarned = true
                     }
                     idleMin >= sleepMin -> {
                         if (!sleeping) {

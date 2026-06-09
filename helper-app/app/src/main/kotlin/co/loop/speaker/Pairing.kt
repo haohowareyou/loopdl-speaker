@@ -30,10 +30,22 @@ import android.util.Log
  *   SCAN_MODE_CONNECTABLE              = 21
  *   SCAN_MODE_CONNECTABLE_DISCOVERABLE = 23
  */
-class Pairing(val ctx: Context) {
+class Pairing(val ctx: Context, val tones: Tones) {
+    companion object {
+        // BluetoothProfile connection-policy constants (hidden).
+        private const val CONNECTION_POLICY_FORBIDDEN = 0
+        private const val CONNECTION_POLICY_ALLOWED = 100
+        // How long a dropped phone stays forbidden before becoming a normal bonded
+        // device again (enough for a new phone to take over the single source slot).
+        private const val REALLOW_MS = 45_000L
+    }
+
     private var autoAccept = false
     private var registered = false
     private val handler = Handler(Looper.getMainLooper())
+    // Separate handler for delayed re-ALLOW so it survives the discoverable-timeout
+    // handler's removeCallbacksAndMessages(null) calls.
+    private val policyHandler = Handler(Looper.getMainLooper())
 
     private val rx = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
@@ -80,14 +92,88 @@ class Pairing(val ctx: Context) {
     }
 
     /** Become discoverable for `seconds` so a phone can find us. Auto-accept must
-     *  already be armed (enableAutoAccept) for the pairing itself to be silent. */
-    fun open(seconds: Int) {
+     *  already be armed (enableAutoAccept) for the pairing itself to be silent.
+     *  Plays the pairing earcon and restarts the discoverable countdown on EVERY call —
+     *  re-triggering while already open re-cues and resets the timer (there's no screen,
+     *  so the earcon is the only "we're open" indicator). */
+    fun open(seconds: Int, announce: Boolean = true) {
         if (!registered) enableAutoAccept()
-        setDiscoverable(true)
+        if (announce) tones.pairing()
+        setDiscoverable(true, seconds)
         Log.i("LoopSpk", "discoverable ${seconds}s")
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed({ setDiscoverable(false) }, seconds * 1000L)
     }
+
+    /** True if any bonded device currently has an active connection. */
+    fun anyConnected(): Boolean {
+        val a = BluetoothAdapter.getDefaultAdapter() ?: return false
+        return (a.bondedDevices ?: emptySet<BluetoothDevice>()).any { isConnected(it) }
+    }
+
+    /** Forced handoff: drop every connected device so a new phone can take over. */
+    fun forceDisconnectConnected(): Boolean = dropExcept(null)
+
+    /** Single-source enforcement: drop every connected device EXCEPT [keep] (the one
+     *  that just connected), so the newest phone always wins. */
+    fun disconnectOthers(keep: BluetoothDevice?): Boolean = dropExcept(keep?.address)
+
+    /** Drop a phone WITHOUT un-bonding it.
+     *
+     *  We used to removeBond() here, which was the root of most of the pairing grief:
+     *  un-bond is one-sided — the speaker forgets the phone but the PHONE keeps its bond,
+     *  so (a) the user had to "Forget device" before re-pairing, and (b) the phone kept
+     *  auto-reconnecting with a now-invalid key, producing the connect/disconnect FLAPPING
+     *  seen in the logs (and the premature/cascading cues).
+     *
+     *  setConnectionPolicy(FORBIDDEN) is the right primitive: it disconnects the device
+     *  AND tells the framework not to auto-reconnect it, while leaving the bond intact on
+     *  both sides — so re-pairing is never required. We also call disconnect() to force
+     *  the teardown immediately rather than waiting for the policy to take effect. The
+     *  forbidden device is re-ALLOWED after a delay so it isn't permanently banished —
+     *  long enough for a new phone to grab us, after which the old one is just a normal
+     *  bonded device that won't fight for the connection.
+     *
+     *  setConnectionPolicy / disconnect are hidden SystemApis (BLUETOOTH_PRIVILEGED via
+     *  privapp). Returns true if at least one connected device was dropped. */
+    private fun dropExcept(keepAddr: String?): Boolean {
+        val a = BluetoothAdapter.getDefaultAdapter() ?: return false
+        var dropped = false
+        for (d in a.bondedDevices ?: emptySet<BluetoothDevice>()) {
+            if (keepAddr != null && d.address == keepAddr) continue
+            if (!isConnected(d)) continue
+            setConnectionPolicy(d, CONNECTION_POLICY_FORBIDDEN)
+            disconnect(d)
+            Log.i("LoopSpk", "forbid+disconnect ...${d.address.takeLast(5)}")
+            // Re-permit after the handoff settles so it isn't banned forever.
+            policyHandler.postDelayed({
+                setConnectionPolicy(d, CONNECTION_POLICY_ALLOWED)
+                Log.i("LoopSpk", "re-allow ...${d.address.takeLast(5)}")
+            }, REALLOW_MS)
+            dropped = true
+        }
+        return dropped
+    }
+
+    private fun setConnectionPolicy(d: BluetoothDevice, policy: Int) = try {
+        BluetoothDevice::class.java
+            .getMethod("setConnectionPolicy", Int::class.javaPrimitiveType)
+            .invoke(d, policy)
+        Unit
+    } catch (e: Exception) {
+        Log.e("LoopSpk", "setConnectionPolicy", e)
+    }
+
+    private fun disconnect(d: BluetoothDevice) = try {
+        BluetoothDevice::class.java.getMethod("disconnect").invoke(d)
+        Unit
+    } catch (e: Exception) {
+        Log.e("LoopSpk", "disconnect", e)
+    }
+
+    private fun isConnected(d: BluetoothDevice): Boolean = try {
+        BluetoothDevice::class.java.getMethod("isConnected").invoke(d) as? Boolean ?: false
+    } catch (_: Exception) { false }
 
     /** A phone connected: stop advertising, but keep auto-accept armed for re-pairs. */
     fun close() {
@@ -96,23 +182,42 @@ class Pairing(val ctx: Context) {
         Log.i("LoopSpk", "discoverable off")
     }
 
-    private fun setDiscoverable(on: Boolean) {
+    private fun setDiscoverable(on: Boolean, seconds: Int = 0) {
         val a = BluetoothAdapter.getDefaultAdapter() ?: return
+        // A13+: the discoverable timeout MUST be set (>0, as a Duration) BEFORE setScanMode,
+        // or setScanMode(SCAN_MODE_CONNECTABLE_DISCOVERABLE) is rejected and the adapter
+        // stays SCAN_MODE_NONE — the bug where we announced "Pairing" but were never
+        // actually discoverable. The old setDiscoverableTimeout(int) overload is gone on
+        // A15 (throws), so we try the Duration signature first.
+        if (on) setDiscoverableTimeout(a, seconds.coerceAtLeast(1))
+        val mode = if (on) 23 else 21
         try {
-            if (on) {
-                // 0 = no timeout on most builds; we also reassert on disconnect.
-                try {
-                    BluetoothAdapter::class.java
-                        .getMethod("setDiscoverableTimeout", Int::class.java)
-                        .invoke(a, 0)
-                } catch (_: Exception) {}
-            }
-            BluetoothAdapter::class.java
-                .getMethod("setScanMode", Int::class.java)
-                .invoke(a, if (on) 23 else 21)
-            Log.i("LoopSpk", "scanMode=${if (on) 23 else 21}")
+            val rc = BluetoothAdapter::class.java
+                .getMethod("setScanMode", Int::class.javaPrimitiveType)
+                .invoke(a, mode)
+            // a.scanMode is the public getter — log the ACTUAL resulting mode, not just
+            // what we asked for, so a silent rejection is visible.
+            Log.i("LoopSpk", "setScanMode($mode) rc=$rc -> scanMode=${a.scanMode}")
         } catch (e: Exception) {
             Log.e("LoopSpk", "scanmode", e)
+        }
+    }
+
+    private fun setDiscoverableTimeout(a: BluetoothAdapter, seconds: Int) {
+        try {
+            BluetoothAdapter::class.java
+                .getMethod("setDiscoverableTimeout", java.time.Duration::class.java)
+                .invoke(a, java.time.Duration.ofSeconds(seconds.toLong()))
+            Log.i("LoopSpk", "discoverableTimeout(Duration ${seconds}s)")
+            return
+        } catch (_: Exception) {}
+        try {
+            BluetoothAdapter::class.java
+                .getMethod("setDiscoverableTimeout", Int::class.javaPrimitiveType)
+                .invoke(a, seconds)
+            Log.i("LoopSpk", "discoverableTimeout(int ${seconds}s)")
+        } catch (e: Exception) {
+            Log.e("LoopSpk", "discoverableTimeout", e)
         }
     }
 }

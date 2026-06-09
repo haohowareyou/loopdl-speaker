@@ -18,6 +18,17 @@ APPF=/data/data/co.loop.speaker/files
 while true; do
   state=$(cat "$STATE" 2>/dev/null)
 
+  # power-hold shutdown from the native daemon (dumb mode). Chime first so the user
+  # — who has no screen — knows it heard them, then power off. The cue volume and the
+  # shutdown are both run from this (su) context where svc/am succeed.
+  if [ -f "$LOOP_DIR/req_shutdown" ]; then
+    rm -f "$LOOP_DIR/req_shutdown"
+    loop_log "ipc: button poweroff"
+    loop_app say "Powering off"
+    sleep 3
+    loop_fix_bcp; /system/bin/svc power shutdown
+  fi
+
   # mode toggle from the native daemon (Power+Vol-Down). The daemon can't run the
   # svc/settings calls in loop-mode from its own exec context, so it drops req_toggle
   # here and we run it in this (u:r:magisk:s0) context where those calls succeed.
@@ -50,7 +61,7 @@ while true; do
     if [ -f "$APPF/req_poweroff" ]; then
       rm -f "$APPF/req_poweroff"
       loop_log "ipc: idle poweroff"
-      svc power shutdown
+      loop_fix_bcp; /system/bin/svc power shutdown
     fi
   fi
 

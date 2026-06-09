@@ -23,6 +23,7 @@ loop_set_radio wifi on
 loop_set_radio data on
 
 settings put system screen_off_timeout 120000
+cmd notification set_dnd off 2>/dev/null    # lift speaker-mode Do-Not-Disturb
 settings put secure double_tap_to_wake 1   # restore normal-phone tap-to-wake
 settings put secure wake_gesture_enabled 1
 settings put secure doze_enabled 1

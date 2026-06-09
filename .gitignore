@@ -29,6 +29,7 @@ mtkclient/
 *.apk
 build/
 .gradle/
+.kotlin/
 *.zip
 !*-template.zip
 # compiled native daemon (build artifact; rebuild with native/Makefile)

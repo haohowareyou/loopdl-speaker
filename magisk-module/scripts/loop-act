@@ -6,6 +6,11 @@ loop_load_config
 case "$1" in
   play_pause|next|prev|pair_open|battery)
     loop_app "$1" ;;
+  shutdown)
+    # Power held in dumb mode = shut the speaker down. Route through the IPC poller
+    # (u:r:magisk:s0): it chimes "Powering off" via the app, waits for the cue, then
+    # runs `svc power shutdown` — calls this daemon exec context is denied.
+    : > "$LOOP_DIR/req_shutdown" ;;
   mode_toggle)
     # Route the switch through the IPC poller (loop-ipc.sh, u:r:magisk:s0) instead of
     # running loop-mode here. This script is invoked by the native daemon, whose exec

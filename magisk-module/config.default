@@ -1,17 +1,17 @@
 DEVICE_NAME="Loop A"
 KEEP_DATA=0
 KEEP_WIFI=0
-PAIR_INITIAL=180
+PAIR_INITIAL=60
 PAIR_RETRIGGER=60
 IDLE_SLEEP_MIN=5
 IDLE_OFF_MIN=15
 INPUT_KEYPAD=""           # auto-detected at install if empty
 INPUT_POWER=""            # auto-detected at install if empty
 A2DP_SINK_PROP="bluetooth.profile.a2dp.sink.enabled"
-GESTURE_PAIR_HOLD_MS=1500     # both volumes held this long = pairing window
+GESTURE_PAIR_HOLD_MS=3000     # both volumes held this long = pairing window
 GESTURE_MODE_HOLD_MS=3000     # power + vol-down held this long = mode toggle (->full)
-POWER_MULTITAP_MS=400        # max gap between power taps: 1=play/pause 2=next 3=prev
-POWER_SHORT_MS=600           # power tap (<this) vs hold (>=this) = normal power / menu
+POWER_SHUTDOWN_MS=2500       # power held alone this long = shut down (chime). shorter = play/pause tap
+VOL_DOUBLETAP_MS=280         # two taps of same vol key within this = skip: vol-up=next, vol-down=prev
 VOL_RAMP_DELAY_MS=500        # hold a volume key this long before it starts ramping
 VOL_RAMP_INTERVAL_MS=260     # while held past the delay, nudge volume every this many ms (gradual)
 GRAB_TOUCH=1                 # 1 = silence (grab+drop) touchscreen in dumb mode (no screen wake)
