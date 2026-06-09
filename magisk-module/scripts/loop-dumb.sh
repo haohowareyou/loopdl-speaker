@@ -19,7 +19,13 @@ settings put secure location_mode 0
 # stack on its next init (i.e. from the next boot) — harmless to re-set every dumb entry.
 settings put global device_name "$DEVICE_NAME"
 settings put secure bluetooth_name "$DEVICE_NAME"
-settings put system screen_off_timeout 15000
+
+# Dumb mode is screen-dark: power the panel off now (root context; the app's own
+# IdleSleep can't because it runs unprivileged). Keep a short timeout as a backstop
+# in case something briefly wakes it (charger insert, etc.). The daemon grabs the
+# power key, so a power tap maps to play/pause and does NOT wake the panel.
+settings put system screen_off_timeout 10000
+input keyevent 223   # KEYCODE_SLEEP
 
 echo dumb > "$STATE"
 loop_app mode_dumb
