@@ -58,7 +58,7 @@ The module's `customize.sh` auto-detects the input device names from `/sys/class
 at install time. If auto-detection fails, set `INPUT_KEYPAD` and `INPUT_POWER`
 manually in `/data/adb/loop-speaker-mode/config`.
 
-## Input event codes
+## Input event codes & device topology
 
 The button daemon (`loopkeyd`) uses these Linux input event codes:
 
@@ -68,16 +68,27 @@ The button daemon (`loopkeyd`) uses these Linux input event codes:
 | Vol− | `KEY_VOLUMEDOWN` = 114 |
 | Power | `KEY_POWER` = 116 |
 
-These are standard Linux codes and are correct on the validated MT6877 unit. Verify
-on your device if you suspect different codes:
+**Confirmed device topology on the validated unit** (`getevent -lp`) — note the volume
+keys are **split across two devices**, which the daemon handles by grabbing both and
+dispatching by keycode:
 
+| `/dev/input/` | Name | Physical keys it carries |
+|---|---|---|
+| `event0` | `mtk-pmic-keys` | **VOLUME_UP + POWER** |
+| `event1` | `mtk-kpd` | **VOLUME_DOWN** |
+| `event2` | `mtk-tpd` | touchscreen (`BTN_TOUCH`) — **never grabbed** |
+| `event3` | `mt6877-mt6359 Headset Jack` | headset remote — **never grabbed** |
+
+So `INPUT_KEYPAD=mtk-kpd` and `INPUT_POWER=mtk-pmic-keys`, but the daemon treats keys by
+code from the *union* of both devices (Vol+ actually arrives on the power device). The
+daemon explicitly refuses to grab the touchscreen or headset jack.
+
+Verify your own unit:
 ```bash
-adb shell su -c 'getevent -lq'
-# Then press each button once; look for EV_KEY lines
+adb shell su -c 'getevent -lp'
+# Find which event device(s) carry KEY_VOLUMEUP/DOWN/POWER and their names;
+# set INPUT_KEYPAD / INPUT_POWER in config to match (the daemon auto-detects by name + capability).
 ```
-
-If your unit uses different codes, update `INPUT_KEYPAD` / `INPUT_POWER` in config
-accordingly.
 
 ## A2DP sink prop
 

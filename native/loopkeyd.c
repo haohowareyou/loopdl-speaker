@@ -1,27 +1,38 @@
 /*
  * loopkeyd — native button daemon for loop-speaker-mode (Android arm64 / MT6877).
  *
- * Grabs the keypad (volume) and power input devices with EVIOCGRAB, runs a
- * gesture state machine, and re-injects single volume taps through a uinput
- * virtual device so normal volume control stays instant. Recognised gestures
- * are emitted as actions by invoking the shell dispatcher:
+ * Grabs the physical button input devices with EVIOCGRAB, runs a gesture state
+ * machine keyed by KEYCODE (not by source device), and re-injects single volume
+ * taps through a uinput virtual device so normal volume control stays instant.
+ * Recognised gestures are emitted as actions by invoking the shell dispatcher:
  *     sh /data/adb/loop-speaker-mode/scripts/loop-act <action>
  *
- * Gestures (thresholds read from config, defaults below):
- *   vol+/vol- single tap   -> re-inject (instant volume)
- *   vol+/vol- double tap    -> "next" / "prev"           (within DOUBLE_TAP_WINDOW_MS)
- *   power short press (<600ms) -> "play_pause"
- *   power long press         -> release grab / pass through (firmware power menu)
- *   both volumes held        -> "pair_open"   (GESTURE_PAIR_HOLD_MS)
- *   all three held           -> "mode_toggle" (GESTURE_MODE_HOLD_MS)
+ * Device topology on this LoopDL (confirmed via getevent -lp, 2026-06-09):
+ *   mtk-pmic-keys  -> KEY_VOLUMEUP (115) AND KEY_POWER (116)
+ *   mtk-kpd        -> KEY_VOLUMEDOWN (114) ONLY
+ *   mtk-tpd        -> touchscreen (BTN_TOUCH ...) — MUST NOT be grabbed
+ *   ...Headset Jack -> headset-remote keys           — MUST NOT be grabbed
  *
- * Key codes (standard Linux input codes; confirm against on-device getevent later):
- *   KEY_VOLUMEUP=115, KEY_VOLUMEDOWN=114, KEY_POWER=116.
+ * The two physical-button devices are grabbed (names from config, defaults
+ * "mtk-kpd" and "mtk-pmic-keys"). Because VOLUMEUP and VOLUMEDOWN live on
+ * DIFFERENT devices, the state machine maintains a single GLOBAL pressed-key
+ * set keyed by code (114/115/116) across every grabbed fd, so combos like
+ * "both volumes held" work even when the events arrive on different fds.
+ *
+ * Gestures (thresholds read from config, defaults below):
+ *   vol+/vol- single tap        -> re-inject (instant volume)
+ *   vol+/vol- double tap        -> "next" / "prev"   (within DOUBLE_TAP_WINDOW_MS)
+ *   power short press (<600ms)   -> "play_pause"
+ *   power long press             -> release grab on the power fd / pass through
+ *   both volumes held            -> "pair_open"   (GESTURE_PAIR_HOLD_MS)
+ *   all three held               -> "mode_toggle" (GESTURE_MODE_HOLD_MS)
+ *
+ * Key codes: KEY_VOLUMEUP=115, KEY_VOLUMEDOWN=114, KEY_POWER=116.
  *
  * --dry-run: detect + log gestures only; do NOT grab devices or emit actions.
  *
- * Fail-safe: if a required device cannot be opened or grabbed, log and exit
- * non-zero so the supervisor restarts (or, in dry-run, exit non-zero too).
+ * Fail-safe: if no button device can be opened/grabbed, log and exit non-zero
+ * so the supervisor restarts (or, in dry-run, exit non-zero too).
  */
 
 #define _GNU_SOURCE
@@ -57,6 +68,8 @@
 /* sane MT6877 defaults; overridden by config name match at runtime */
 #define DEF_KEYPAD_NAME "mtk-kpd"
 #define DEF_POWER_NAME  "mtk-pmic-keys"
+
+#define MAX_DEVS 8
 
 /* config-tunable thresholds (ms) */
 static long double_tap_ms   = 300;
@@ -126,51 +139,122 @@ static void load_config(void) {
     fclose(f);
 }
 
-/* ---- device discovery: scan /dev/input/event* and match EVIOCGNAME ---- */
-/* match_kind: 0 = keypad (looks for volume keys), 1 = power. */
-static int open_input_by_name(const char *want, int match_kind) {
+/* ---- capability helpers over an EV_KEY bitmap ---- */
+#define HASBIT(arr, b) ((arr[(b) / (8 * sizeof(unsigned long))] >> \
+                         ((b) % (8 * sizeof(unsigned long)))) & 1UL)
+
+/* Returns 1 if the fd's device must NEVER be grabbed (touchscreen / headset). */
+static int is_excluded(int fd, const char *name) {
+    /* headset / jack devices: name-based exclusion */
+    if (strstr(name, "Headset") || strstr(name, "Jack")) return 1;
+
+    /* touchscreen: exposes BTN_TOUCH */
+    unsigned long keys[(KEY_MAX / (8 * sizeof(unsigned long))) + 1];
+    memset(keys, 0, sizeof(keys));
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys) >= 0) {
+        if (HASBIT(keys, BTN_TOUCH)) return 1;
+    }
+    return 0;
+}
+
+/* Returns 1 if the device carries any of our button keys and is not excluded. */
+static int is_button_dev(int fd, const char *name) {
+    if (is_excluded(fd, name)) return 0;
+    unsigned long keys[(KEY_MAX / (8 * sizeof(unsigned long))) + 1];
+    memset(keys, 0, sizeof(keys));
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys) < 0) return 0;
+    return HASBIT(keys, KEY_VOLUMEUP) || HASBIT(keys, KEY_VOLUMEDOWN) ||
+           HASBIT(keys, KEY_POWER);
+}
+
+/* Returns 1 if the device exposes KEY_POWER (and is grabbable). */
+static int has_power(int fd, const char *name) {
+    if (is_excluded(fd, name)) return 0;
+    unsigned long keys[(KEY_MAX / (8 * sizeof(unsigned long))) + 1];
+    memset(keys, 0, sizeof(keys));
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys) < 0) return 0;
+    return HASBIT(keys, KEY_POWER);
+}
+
+/* ---- device discovery ----
+ * Collects every physical-button device to grab into devs[]/dev_names[].
+ * Strategy:
+ *   1. Match the two configured names (INPUT_KEYPAD, INPUT_POWER) — defaults
+ *      "mtk-kpd" / "mtk-pmic-keys". Excluded devices are never grabbed.
+ *   2. If neither configured name matched anything, fall back to a
+ *      capability scan: grab every non-excluded device exposing a button key.
+ * Sets *power_idx to the index of a grabbed device exposing KEY_POWER (or -1).
+ * Returns the number of devices collected.
+ */
+static int collect_button_devs(int *devs, char dev_names[][128], int *power_idx) {
+    const char *want[2] = {
+        cfg_keypad[0] ? cfg_keypad : DEF_KEYPAD_NAME,
+        cfg_power[0]  ? cfg_power  : DEF_POWER_NAME,
+    };
+    int n = 0;
+    *power_idx = -1;
+
+    /* pass 1: configured / default names */
+    for (int w = 0; w < 2 && n < MAX_DEVS; w++) {
+        if (!want[w][0]) continue;
+        DIR *d = opendir("/dev/input");
+        if (!d) break;
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL && n < MAX_DEVS) {
+            if (strncmp(e->d_name, "event", 5) != 0) continue;
+            char path[64];
+            snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
+            int fd = open(path, O_RDONLY);
+            if (fd < 0) continue;
+            char name[128] = "";
+            ioctl(fd, EVIOCGNAME(sizeof(name)), name);
+
+            if (strstr(name, want[w]) && !is_excluded(fd, name)) {
+                /* skip if this fd path is already collected (both names could
+                 * theoretically match the same device) */
+                int dup = 0;
+                for (int j = 0; j < n; j++)
+                    if (strcmp(dev_names[j], name) == 0) { dup = 1; break; }
+                if (!dup) {
+                    logln("matched \"%s\" -> %s (\"%s\")", want[w], path, name);
+                    devs[n] = fd;
+                    snprintf(dev_names[n], 128, "%s", name);
+                    if (*power_idx < 0 && has_power(fd, name)) *power_idx = n;
+                    n++;
+                    fd = -1; /* keep open */
+                }
+            }
+            if (fd >= 0) close(fd);
+        }
+        closedir(d);
+    }
+    if (n > 0) return n;
+
+    /* pass 2: capability fallback (no configured name matched) */
     DIR *d = opendir("/dev/input");
-    if (!d) return -1;
+    if (!d) return 0;
     struct dirent *e;
-    int found = -1;
-    while ((e = readdir(d)) != NULL) {
+    while ((e = readdir(d)) != NULL && n < MAX_DEVS) {
         if (strncmp(e->d_name, "event", 5) != 0) continue;
         char path[64];
         snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
         int fd = open(path, O_RDONLY);
         if (fd < 0) continue;
-
         char name[128] = "";
         ioctl(fd, EVIOCGNAME(sizeof(name)), name);
 
-        int ok = 0;
-        if (want && want[0]) {
-            ok = (strstr(name, want) != NULL);
+        if (is_button_dev(fd, name)) {
+            logln("cap-match -> %s (\"%s\")", path, name);
+            devs[n] = fd;
+            snprintf(dev_names[n], 128, "%s", name);
+            if (*power_idx < 0 && has_power(fd, name)) *power_idx = n;
+            n++;
         } else {
-            /* no config name: capability-based fallback */
-            unsigned long keys[(KEY_MAX / (8 * sizeof(unsigned long))) + 1];
-            memset(keys, 0, sizeof(keys));
-            if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys) >= 0) {
-#define HASKEY(k) ((keys[(k) / (8 * sizeof(unsigned long))] >> \
-                    ((k) % (8 * sizeof(unsigned long)))) & 1UL)
-                if (match_kind == 0) {
-                    ok = HASKEY(KEY_VOLUMEUP) && HASKEY(KEY_VOLUMEDOWN);
-                } else {
-                    ok = HASKEY(KEY_POWER) && !HASKEY(KEY_VOLUMEUP);
-                }
-#undef HASKEY
-            }
+            close(fd);
         }
-        if (ok) {
-            logln("matched %s -> %s (\"%s\")",
-                  match_kind == 0 ? "keypad" : "power", path, name);
-            found = fd;
-            break;
-        }
-        close(fd);
     }
     closedir(d);
-    return found;
+    return n;
 }
 
 /* ---- uinput virtual device for volume re-injection ---- */
@@ -246,21 +330,33 @@ int main(int argc, char **argv) {
     signal(SIGTERM, on_sig);
     signal(SIGINT, on_sig);
 
-    int kfd = open_input_by_name(cfg_keypad[0] ? cfg_keypad : DEF_KEYPAD_NAME, 0);
-    if (kfd < 0 && !cfg_keypad[0]) kfd = open_input_by_name("", 0); /* cap fallback */
-    int pfd = open_input_by_name(cfg_power[0] ? cfg_power : DEF_POWER_NAME, 1);
-    if (pfd < 0 && !cfg_power[0]) pfd = open_input_by_name("", 1);  /* cap fallback */
+    int devs[MAX_DEVS];
+    char dev_names[MAX_DEVS][128];
+    int power_idx = -1;
+    int ndev = collect_button_devs(devs, dev_names, &power_idx);
 
-    if (kfd < 0 || pfd < 0) {
-        logln("FATAL: could not open input devices (keypad=%d power=%d)", kfd, pfd);
+    if (ndev == 0) {
+        logln("FATAL: no button input devices found");
         return 2;
     }
+    if (power_idx < 0) {
+        logln("FATAL: no grabbable device exposes KEY_POWER");
+        for (int i = 0; i < ndev; i++) close(devs[i]);
+        return 2;
+    }
+    logln("grabbed %d button device(s), power on \"%s\"",
+          ndev, dev_names[power_idx]);
 
     int ufd = -1;
     if (!dry_run) {
-        if (ioctl(kfd, EVIOCGRAB, 1) < 0 || ioctl(pfd, EVIOCGRAB, 1) < 0) {
-            logln("FATAL: EVIOCGRAB failed: %s", strerror(errno));
-            return 3;
+        for (int i = 0; i < ndev; i++) {
+            if (ioctl(devs[i], EVIOCGRAB, 1) < 0) {
+                logln("FATAL: EVIOCGRAB failed on \"%s\": %s",
+                      dev_names[i], strerror(errno));
+                /* release any already-grabbed devices before bailing */
+                for (int j = 0; j < i; j++) ioctl(devs[j], EVIOCGRAB, 0);
+                return 3;
+            }
         }
         ufd = uinput_setup();
         if (ufd < 0) {
@@ -279,24 +375,25 @@ int main(int argc, char **argv) {
     struct epoll_event ev;
 #define EP_ADD(fd, tag) do { ev.events = EPOLLIN; ev.data.u32 = (tag); \
                              epoll_ctl(ep, EPOLL_CTL_ADD, (fd), &ev); } while (0)
-    enum { TAG_KEY = 1, TAG_PWR_DEV, TAG_T_DBL, TAG_T_PAIR, TAG_T_MODE, TAG_T_PWR };
-    EP_ADD(kfd, TAG_KEY);
-    EP_ADD(pfd, TAG_PWR_DEV);
+    /* tags 0..ndev-1 are the grabbed input fds; timers use high tags */
+    enum { TAG_T_DBL = 100, TAG_T_PAIR, TAG_T_MODE, TAG_T_PWR };
+    for (int i = 0; i < ndev; i++) EP_ADD(devs[i], (uint32_t)i);
     EP_ADD(t_dbl, TAG_T_DBL);
     EP_ADD(t_pair, TAG_T_PAIR);
     EP_ADD(t_mode, TAG_T_MODE);
     EP_ADD(t_pwr, TAG_T_PWR);
 #undef EP_ADD
 
-    /* gesture state */
+    /* GLOBAL gesture state — keyed by keycode across ALL grabbed devices.
+     * VOLUMEUP and VOLUMEDOWN can arrive on different fds; combos still work. */
     int vup_down = 0, vdn_down = 0, pwr_down = 0;
     int pending_dbl = 0;        /* a volume key awaiting its second tap */
     int pending_code = 0;       /* which volume key is pending */
-    int pwr_passthrough = 0;    /* grab released for power menu */
+    int pwr_passthrough = 0;    /* grab released on power fd for power menu */
 
     while (running) {
-        struct epoll_event evs[8];
-        int n = epoll_wait(ep, evs, 8, -1);
+        struct epoll_event evs[8 + MAX_DEVS];
+        int n = epoll_wait(ep, evs, 8 + MAX_DEVS, -1);
         if (n < 0) {
             if (errno == EINTR) continue;
             break;
@@ -329,19 +426,21 @@ int main(int argc, char **argv) {
             if (tag == TAG_T_PWR) {
                 drain_timer(t_pwr);
                 /* power held past short-press threshold -> long press.
-                 * Release grab so firmware power menu / shutdown works. */
+                 * Release grab on the power fd so firmware power menu works.
+                 * (This momentarily frees VOLUMEUP too, since it shares the
+                 * mtk-pmic-keys device — acceptable; re-grabbed on release.) */
                 if (pwr_down && !(vup_down && vdn_down)) {
                     logln("power long-press: passthrough");
                     if (!dry_run && !pwr_passthrough) {
-                        ioctl(pfd, EVIOCGRAB, 0);
+                        ioctl(devs[power_idx], EVIOCGRAB, 0);
                         pwr_passthrough = 1;
                     }
                 }
                 continue;
             }
 
-            /* an input device became readable */
-            int dev_fd = (tag == TAG_KEY) ? kfd : pfd;
+            /* a grabbed input device (tag < ndev) became readable */
+            int dev_fd = devs[tag];
             struct input_event ie;
             ssize_t r;
             while ((r = read(dev_fd, &ie, sizeof(ie))) == (ssize_t)sizeof(ie)) {
@@ -357,7 +456,8 @@ int main(int argc, char **argv) {
                         if (is_up) vup_down = 1; else vdn_down = 1;
 
                         if (vup_down && vdn_down) {
-                            /* both volumes: candidate for pair / mode combos */
+                            /* both volumes (possibly across two fds): candidate
+                             * for pair / mode combos */
                             timer_arm(t_pair, pair_hold_ms);
                             if (pwr_down) timer_arm(t_mode, mode_hold_ms);
                             /* don't treat as volume nudge while combo forming */
@@ -395,8 +495,8 @@ int main(int argc, char **argv) {
                         pwr_down = 0;
                         timer_disarm(t_mode);
                         if (pwr_passthrough) {
-                            /* re-grab after passthrough power event finished */
-                            if (!dry_run) ioctl(pfd, EVIOCGRAB, 1);
+                            /* re-grab the power fd after the passthrough event */
+                            if (!dry_run) ioctl(devs[power_idx], EVIOCGRAB, 1);
                             pwr_passthrough = 0;
                             logln("power released: re-grabbed");
                         } else {
@@ -412,11 +512,12 @@ int main(int argc, char **argv) {
 
     logln("shutting down");
     if (!dry_run) {
-        ioctl(kfd, EVIOCGRAB, 0);
-        if (!pwr_passthrough) ioctl(pfd, EVIOCGRAB, 0);
+        for (int i = 0; i < ndev; i++) {
+            if (i == power_idx && pwr_passthrough) continue; /* already released */
+            ioctl(devs[i], EVIOCGRAB, 0);
+        }
         if (ufd >= 0) { ioctl(ufd, UI_DEV_DESTROY); close(ufd); }
     }
-    close(kfd);
-    close(pfd);
+    for (int i = 0; i < ndev; i++) close(devs[i]);
     return 0;
 }
