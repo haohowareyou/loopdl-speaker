@@ -1,0 +1,8 @@
+#!/system/bin/sh
+D="$(dirname "$0")"
+case "$1" in
+  dumb) sh "$D/loop-dumb.sh" ;;
+  full) sh "$D/loop-full.sh" ;;
+  status) cat /data/adb/loop-speaker-mode/state 2>/dev/null || echo unknown ;;
+  *) echo "usage: loop-mode dumb|full|status" >&2; exit 2 ;;
+esac
