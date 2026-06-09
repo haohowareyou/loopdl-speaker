@@ -106,6 +106,9 @@ rogue sideloaded app are the only real surfaces):
   open (time-bounded), the window always self-closes (timeout / connect / mode-switch /
   service destroy), and `ACTION_PAIRING_REQUEST` is a protected broadcast a normal app
   cannot spoof. The device is **not** discoverable or auto-accepting outside a window.
+  The receiver registers at `SYSTEM_HIGH_PRIORITY` and calls `abortBroadcast()` to
+  suppress the system pairing dialog (zero-tap) — this only fires inside an open window,
+  so it does not weaken the time-bounded guarantee.
 - **Control broadcasts are permission-gated** — `co.loop.speaker.CMD` is protected by a
   `signature`-level permission, so a sideloaded app cannot open a pairing window or
   toggle modes. The module's own callers run as root (uid 0, exempt) so internal
@@ -129,8 +132,36 @@ be added.
 
 ## Verified on-device
 
-**Pending final test session.**
+### UX refinements — adb-verifiable checks (2026-06-09)
 
-This section will be updated after the complete end-to-end test described in the
-implementation plan (Task 19: cold boot, pairing, AVRCP, volume, mode toggle,
-auto-sleep, uninstall clean revert).
+All of the following were verified on the validated unit after flashing the
+mode-UX-refinements build:
+
+- **Cold boot → Dumb**, daemon up with `dbl=300ms pair=1500ms mode=5000ms`, both button
+  devices grabbed (`mtk-kpd` event1, `mtk-pmic-keys` event0), helper app running with
+  `BLUETOOTH_CONNECT/SCAN` granted, root IPC poller (`loop-ipc.sh`) running.
+- **Dumb is screen-dark even on a charger** — `loop-dumb.sh` clears
+  `stay_on_while_plugged_in` and issues `KEYCODE_SLEEP`; `mWakefulness=Asleep` confirmed.
+- **Full mode releases the buttons** — after `loop-mode full`, `state=full` and the
+  grabbing daemon is gone and *stays* gone (the F2 relaunch race is fixed: state flips to
+  full before the daemon is killed, so the supervisor never relaunches it).
+- **Full → Dumb via the QS-tile IPC path** — a `req_dumb` trigger written with the app's
+  real uid + `privapp_data_file` SELinux label (exactly what `SpeakerTile.onClick`
+  produces) is read and consumed by the root poller, which runs `loop-mode dumb`. Proves
+  Magisk root can read the app's private trigger file — **no sdcard fallback needed**.
+- **Idle screen-off via root IPC** — an app-labeled `req_sleep` trigger is consumed by
+  the poller and blanks the panel (`KEYCODE_SLEEP`). `req_poweroff` uses the identical
+  mechanism (not exercised destructively).
+
+### Still needs physical-button / phone validation
+
+`sendevent` cannot reproduce timed multi-key gestures, and a QS tile tap is a UI action —
+these require hands on the device:
+
+- Vol± single tap → volume (after ~300 ms decode); Vol± double-tap → next/prev.
+- Power tap → play/pause; Power long-hold (no volume) → firmware power menu.
+- **Both volumes held ≥1.5 s → pairing window** (zero-tap auto-accept; "Pairing" cue).
+- **Power + Vol-Down held ≥5 s → Dumb→Full** (apps return, Lawnchair home; confirm NO reboot).
+- **QS "Speaker Mode" tile → Full→Dumb** within ~2 s.
+- A2DP audio through the speaker, AVRCP transport control, volume sync, TTS cues @50%.
+- Two-stage auto-sleep timing (5 min screen-off, 15 min power-off).
