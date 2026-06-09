@@ -38,12 +38,17 @@ Bluetooth open for pairing.
 | Cellular data | OFF | ON |
 | WiFi | OFF | ON |
 | NFC / location | OFF | restored |
-| Screen | forced dark (15 s timeout) | normal |
+| Screen | powered off on entry (10 s backstop timeout) | normal |
 | Bluetooth | ON — A2DP sink, auto-pair | ON — not auto-discoverable |
 | 29 toggled apps | disabled | enabled |
 | 3 rainx apps | **always disabled** | **always disabled** |
+| Launcher (home) | n/a (screen off) | Lawnchair |
 | Button daemon | active (speaker gestures) | released (normal Android) |
-| Auto-sleep | 5 min → suspend, 15 min → power off | standard Android timeout |
+| Auto-sleep | 5 min → screen off, 15 min → power off | standard Android timeout |
+
+Auto-sleep is driven by the helper app (it knows when music is playing) but executed by
+root: the app is unprivileged and cannot blank/shut down the device itself, so it drops a
+trigger file in its `filesDir` that the root IPC poller (`loop-ipc.sh`) acts on.
 
 The 3 rainx packages are permanently disabled in both modes. This is intentional —
 rainx code never runs on this device regardless of mode.
@@ -57,26 +62,39 @@ Switching modes takes a few seconds while the 29 packages are toggled. A TTS cue
 
 | Gesture | Action |
 |---------|--------|
-| Vol+ tap | Volume up (instant) |
-| Vol− tap | Volume down (instant) |
+| Vol+ tap | Volume up |
+| Vol− tap | Volume down |
 | Vol+ double-tap | Next track (AVRCP passthrough to source phone) |
 | Vol− double-tap | Previous track |
 | Power tap (< 600 ms) | Play / pause (AVRCP) |
-| Power hold | Normal power off/on (passed through to firmware) |
-| Both volumes held 3 s | Open pairing window (60 s) |
-| All 3 buttons held 5 s | Toggle Dumb ↔ Full |
+| Power hold (no volume) | Normal power menu (grab released to firmware) |
+| Both volumes held 1.5 s | Open pairing window (60 s) |
+| **Power + Vol− held 5 s** | Switch Dumb → Full |
 
-Volume is applied immediately on the first tap; the daemon opens a short window
-(`DOUBLE_TAP_WINDOW_MS`, default 300 ms) to detect a second tap for track skip.
-There is no latency added to normal volume changes.
+**Delayed-volume decode:** a single volume press is deferred by `DOUBLE_TAP_WINDOW_MS`
+(default 300 ms) before it acts, so the daemon can first tell apart a second key — the
+other volume (a combo) or the same volume again (a double-tap for track skip). This adds
+~300 ms of latency to a lone volume nudge but makes the both-volumes pairing combo
+reliable (it no longer mis-fires as next/prev). Combos are recognised instantly.
+
+**Why Power + Vol−, not all three:** a long **Power + Vol-Up** hold triggers the MT6877
+PMIC hardware force-reboot *below the OS* — the daemon can't intercept it. The mode
+gesture deliberately uses **Power + Vol-Down** to avoid that path.
 
 In Full-Phone mode, the button daemon releases its input grabs and all buttons behave
-as standard Android.
+as standard Android — so there is **no button to return to Dumb**. Use the Quick-Settings
+tile instead (below).
 
-**Fallback:** If the 3-button-5s combo is intercepted by the kernel before the daemon
-sees it (hardware-dependent), the mode toggle falls back to `both volumes held 5 s`
-(distinct from the 3 s pairing hold). The correct hold durations for your unit are
-confirmed during first boot via `getevent`.
+### Returning to Dumb (Full → Dumb)
+
+Full-Phone mode has no grabbing daemon, so the return path is a **Quick-Settings tile**:
+
+1. Pull down Quick Settings → edit (pencil) → add the **"Speaker Mode"** tile.
+2. Tap it → the device returns to Dumb within ~2 s (screen off, apps re-disabled).
+
+Mechanism: the tile is part of the helper app, which is unprivileged. It drops a
+`req_dumb` trigger file in its `filesDir`; the root IPC poller (`loop-ipc.sh`) sees it
+and runs `loop-mode dumb`. A full power-off/on also always boots back to Dumb (safety net).
 
 ---
 
@@ -87,12 +105,15 @@ confirmed during first boot via `getevent`.
    TTS says "Pairing".
 3. Phone connects → TTS says "Connected", window closes immediately (no longer
    discoverable).
-4. **Both volumes held 3 s** at any time → reopen the window for `PAIR_RETRIGGER`
+4. **Both volumes held 1.5 s** at any time → reopen the window for `PAIR_RETRIGGER`
    (60 s). Pressing again resets the timer.
 5. Window always self-closes on timeout — the device is never stuck discoverable.
 
-Pairing uses Bluetooth Just-Works (no PIN). The helper app's `ACTION_PAIRING_REQUEST`
-receiver auto-accepts only while a window is open.
+Pairing uses Bluetooth Just-Works (no PIN) and is **zero-tap**: the helper app's
+`ACTION_PAIRING_REQUEST` receiver registers at `SYSTEM_HIGH_PRIORITY`, auto-accepts via
+`setPairingConfirmation(true)`, and calls `abortBroadcast()` to suppress the system
+pairing dialog — so nothing needs to be tapped on the (dark) screen. It only does this
+while a pairing window is open.
 
 ---
 
@@ -120,9 +141,9 @@ adb shell su -c 'vi /data/adb/loop-speaker-mode/config'
 | `INPUT_KEYPAD` | `"mtk-kpd"` | Input device name for volume buttons (auto-detected at install) |
 | `INPUT_POWER` | `"mtk-pmic-keys"` | Input device name for power button (auto-detected at install) |
 | `A2DP_SINK_PROP` | `"bluetooth.profile.a2dp.sink.enabled"` | Prop name for A2DP sink (do not change) |
-| `GESTURE_PAIR_HOLD_MS` | `3000` | Hold duration to open pairing window (ms) |
-| `GESTURE_MODE_HOLD_MS` | `5000` | Hold duration to toggle modes (ms) |
-| `DOUBLE_TAP_WINDOW_MS` | `300` | Window to detect a double-tap for track skip (ms) |
+| `GESTURE_PAIR_HOLD_MS` | `1500` | Hold both volumes this long to open pairing window (ms) |
+| `GESTURE_MODE_HOLD_MS` | `5000` | Hold Power+Vol− this long to switch Dumb→Full (ms) |
+| `DOUBLE_TAP_WINDOW_MS` | `300` | Double-tap window for track skip — also the delayed-volume decode delay (ms) |
 | `CUE_VOLUME_PCT` | `50` | TTS and audio cue volume as % of max (tune to taste) |
 
 After editing config, apply without rebooting:
@@ -131,6 +152,33 @@ After editing config, apply without rebooting:
 adb shell su -c 'sh /data/adb/loop-speaker-mode/scripts/loop-mode dumb'
 # or: loop-mode full
 ```
+
+---
+
+## Full-mode launcher (Lawnchair)
+
+The rainx launcher is permanently disabled (privacy), and the AOSP fallback
+(`com.android.launcher3`) looks broken (empty hotseat, no app feed). Full-Phone mode
+uses **Lawnchair** instead — open-source, Pixel-like, no Google account required. It is
+installed as a normal user app (not part of the module) and set as the default home; the
+preference persists across reboots. In Dumb mode the screen stays off, so the launcher
+only ever shows in Full mode.
+
+Reproducible setup (host with adb + root):
+
+```bash
+# Lawnchair 15 beta (Android 15 target). Latest asset at:
+#   https://github.com/LawnchairLauncher/lawnchair/releases
+adb install -r Lawnchair.15.0.0.Beta.3.0.apk
+adb shell su -c 'cmd package set-home-activity app.lawnchair/app.lawnchair.LawnchairLauncher'
+
+# verify:
+adb shell 'cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME' | grep packageName
+# expected: packageName=app.lawnchair
+```
+
+The APK is **not** committed to the repo. On first Home press in Full mode, Lawnchair
+runs a one-time setup wizard.
 
 ---
 
