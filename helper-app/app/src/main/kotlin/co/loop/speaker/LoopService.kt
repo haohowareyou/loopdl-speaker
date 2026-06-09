@@ -41,6 +41,7 @@ class LoopService : Service() {
     private lateinit var idleSleep: IdleSleep
     private lateinit var volume: Volume
     private var ready = false
+    private var dumbMode = false
 
     // A2DP connect/disconnect events poke idle timer and trigger cues
     private val a2dpReceiver = object : BroadcastReceiver() {
@@ -49,12 +50,15 @@ class LoopService : Service() {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
                     Log.i(TAG, "A2DP connected")
                     idleSleep.poke()
-                    pairing.close()
+                    pairing.close()          // stop advertising; keep auto-accept armed
                     cues.say("Connected")
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     Log.i(TAG, "A2DP disconnected")
                     idleSleep.poke()
+                    // Speaker behaviour: become discoverable again whenever nothing is
+                    // connected, so the next phone can find and silently re-pair.
+                    if (dumbMode) pairing.open(Config.PAIR_INITIAL)
                 }
             }
         }
@@ -109,9 +113,13 @@ class LoopService : Service() {
             "ping"       -> { /* health check — already logged above */ }
 
             "mode_dumb"  -> {
+                dumbMode = true
                 cues.say("Speaker mode")
                 idleSleep.start()
-                // Try to reconnect last phone; fall back to initial pairing window
+                // Always silently auto-accept while we're a speaker. Then try to
+                // reconnect the last phone; if that fails, advertise so a new phone
+                // can find us (auto-accept makes the pairing itself codeless).
+                pairing.enableAutoAccept()
                 reconnect.tryLast {
                     cues.say("Pairing")
                     pairing.open(Config.PAIR_INITIAL)
@@ -119,13 +127,15 @@ class LoopService : Service() {
             }
 
             "mode_full"  -> {
+                dumbMode = false
                 cues.say("Full mode")
                 idleSleep.stop()
-                pairing.close()
+                pairing.disableAutoAccept()
             }
 
             "pair_open"  -> {
                 cues.say("Pairing")
+                pairing.enableAutoAccept()
                 pairing.open(Config.PAIR_RETRIGGER)
             }
 

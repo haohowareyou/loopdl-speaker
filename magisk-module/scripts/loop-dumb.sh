@@ -43,6 +43,9 @@ for g in $(find /sys/devices -name fts_gesture_mode 2>/dev/null); do
 done
 settings put secure wake_gesture_enabled 0   # lift/tilt-to-check wake
 settings put secure doze_enabled 0           # ambient display pulses
+# Audible volume tick: the screen is off in dumb mode, so play the system
+# volume-adjustment sound on each step (routed to the speaker) for feedback.
+settings put system sound_effects_enabled 1
 settings put system screen_off_timeout 10000
 input keyevent 223   # KEYCODE_SLEEP
 
