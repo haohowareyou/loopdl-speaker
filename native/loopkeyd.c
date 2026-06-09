@@ -21,16 +21,20 @@
  *
  * Gestures (thresholds read from config, defaults below):
  *   vol+/vol- single tap        -> re-inject volume INSTANTLY (no added latency)
- *   vol+/vol- double tap        -> "next" / "prev"   (within DOUBLE_TAP_WINDOW_MS)
- *   power short press (<600ms)   -> "play_pause"
+ *   vol+/vol- hold              -> ramp volume (after VOL_RAMP_DELAY_MS)
+ *   power single tap            -> "play_pause"
+ *   power double tap            -> "next"   (gap between taps < POWER_MULTITAP_MS)
+ *   power triple tap            -> "prev"
  *   power long press (no vol)    -> release grab on power fd / pass through
  *   both volumes held            -> "pair_open"   (GESTURE_PAIR_HOLD_MS)
  *   power + vol-down held        -> "mode_toggle" (GESTURE_MODE_HOLD_MS)  [-> full mode]
  *
- * Volume nudges fire immediately on press. A double tap of the same key also skips a
- * track (so a quick double registers as volume+volume+skip). Combos (pair/mode) are
- * detected by HOLD timers armed when the keys go down, independent of press order, and
- * they cancel the pending double-tap when they win.
+ * Volume nudges fire immediately on press with NO double-tap, so adjusting volume can
+ * never accidentally skip a track. Track skip/rewind lives on power multi-tap instead.
+ * A power tap is deferred POWER_MULTITAP_MS to see whether more taps follow, so
+ * play/pause carries that much latency (the cost of multi-tap disambiguation). Combos
+ * (pair/mode) are detected by HOLD timers armed when the keys go down, independent of
+ * press order.
  *
  * Key codes: KEY_VOLUMEUP=115, KEY_VOLUMEDOWN=114, KEY_POWER=116.
  *
@@ -78,7 +82,7 @@
 #define MAX_SIL  4          /* touchscreen / silence devices grabbed-and-dropped */
 
 /* config-tunable thresholds (ms) */
-static long double_tap_ms   = 300;
+static long ptap_ms         = 400;     /* max gap between power taps for multi-tap */
 static long pair_hold_ms    = 3000;
 static long mode_hold_ms    = 5000;
 static long power_short_ms  = 600;
@@ -140,7 +144,7 @@ static void load_config(void) {
         if (line[0] == '#') continue;
         cfg_str(line, "INPUT_KEYPAD", cfg_keypad, sizeof(cfg_keypad));
         cfg_str(line, "INPUT_POWER", cfg_power, sizeof(cfg_power));
-        cfg_long(line, "DOUBLE_TAP_WINDOW_MS", &double_tap_ms);
+        cfg_long(line, "POWER_MULTITAP_MS", &ptap_ms);
         cfg_long(line, "GESTURE_PAIR_HOLD_MS", &pair_hold_ms);
         cfg_long(line, "GESTURE_MODE_HOLD_MS", &mode_hold_ms);
         cfg_long(line, "POWER_SHORT_MS", &power_short_ms);
@@ -374,8 +378,8 @@ int main(int argc, char **argv) {
         if (strcmp(argv[i], "--dry-run") == 0) dry_run = 1;
 
     load_config();
-    logln("start (dry_run=%d) dbl=%ldms pair=%ldms mode=%ldms pwr=%ldms",
-          dry_run, double_tap_ms, pair_hold_ms, mode_hold_ms, power_short_ms);
+    logln("start (dry_run=%d) ptap=%ldms pair=%ldms mode=%ldms pwr=%ldms",
+          dry_run, ptap_ms, pair_hold_ms, mode_hold_ms, power_short_ms);
 
     signal(SIGTERM, on_sig);
     signal(SIGINT, on_sig);
@@ -435,8 +439,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* timers: double-tap window, pair-hold, mode-hold, power long-press, vol-ramp */
-    int t_dbl  = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+    /* timers: power multi-tap window, pair-hold, mode-hold, power long-press, vol-ramp */
+    int t_ptap = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     int t_pair = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     int t_mode = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     int t_pwr  = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
@@ -448,11 +452,11 @@ int main(int argc, char **argv) {
                              epoll_ctl(ep, EPOLL_CTL_ADD, (fd), &ev); } while (0)
     /* tags 0..ndev-1 are grabbed button fds; TAG_SIL..+nsil are silenced
      * touchscreens (drained + dropped); timers use high tags. */
-    enum { TAG_SIL = MAX_DEVS, TAG_T_DBL = 100, TAG_T_PAIR, TAG_T_MODE,
+    enum { TAG_SIL = MAX_DEVS, TAG_T_PTAP = 100, TAG_T_PAIR, TAG_T_MODE,
            TAG_T_PWR, TAG_T_VREP };
     for (int i = 0; i < ndev; i++) EP_ADD(devs[i], (uint32_t)i);
     for (int i = 0; i < nsil; i++) EP_ADD(sdevs[i], (uint32_t)(TAG_SIL + i));
-    EP_ADD(t_dbl, TAG_T_DBL);
+    EP_ADD(t_ptap, TAG_T_PTAP);
     EP_ADD(t_pair, TAG_T_PAIR);
     EP_ADD(t_mode, TAG_T_MODE);
     EP_ADD(t_pwr, TAG_T_PWR);
@@ -462,9 +466,9 @@ int main(int argc, char **argv) {
     /* GLOBAL gesture state — keyed by keycode across ALL grabbed devices.
      * VOLUMEUP and VOLUMEDOWN can arrive on different fds; combos still work. */
     int vup_down = 0, vdn_down = 0, pwr_down = 0;
-    int vol_pending = 0;        /* a volume key code awaiting decode (0 = none) */
+    int pwr_taps = 0;           /* accumulated short power taps awaiting multi-tap decode */
     int pwr_passthrough = 0;    /* grab released on power fd for power menu */
-    int pwr_consumed = 0;       /* power was part of mode combo -> no play_pause on release */
+    int pwr_consumed = 0;       /* power was part of mode combo -> no tap on release */
     int pwr_long = 0;           /* power held past short threshold -> not a tap */
     int held_vol = 0;           /* volume key code held for ramp (0 = none) */
 
@@ -503,11 +507,14 @@ int main(int argc, char **argv) {
                 continue;
             }
 
-            if (tag == TAG_T_DBL) {
-                drain_timer(t_dbl);
-                /* double-tap window closed: it was a single tap. Volume was already
-                 * nudged instantly on press, so just clear the pending state. */
-                vol_pending = 0;
+            if (tag == TAG_T_PTAP) {
+                drain_timer(t_ptap);
+                /* multi-tap window closed: decode the accumulated power taps.
+                 * 1 = play/pause, 2 = next, 3+ = prev. */
+                if (pwr_taps == 1)      emit("play_pause");
+                else if (pwr_taps == 2) emit("next");
+                else if (pwr_taps >= 3) emit("prev");
+                pwr_taps = 0;
                 continue;
             }
             if (tag == TAG_T_PAIR) {
@@ -517,8 +524,6 @@ int main(int argc, char **argv) {
                  * of mode); let t_mode handle it instead of firing pairing here. */
                 if (vup_down && vdn_down && !pwr_down) {
                     emit("pair_open");
-                    /* consume: cancel any pending single-volume decode */
-                    vol_pending = 0;
                 }
                 continue;
             }
@@ -569,25 +574,16 @@ int main(int argc, char **argv) {
                         if (other_down) {
                             /* both volumes down -> pair window; if power is also down,
                              * it's the mode combo instead (armed below / in power press). */
-                            vol_pending = 0;
                             held_vol = 0;
-                            timer_disarm(t_dbl);
                             timer_disarm(t_vrep);
                             timer_arm(t_pair, pair_hold_ms);
                             if (pwr_down) timer_arm(t_mode, mode_hold_ms);
                         } else {
-                            /* INSTANT volume: nudge now so volume never lags. */
+                            /* INSTANT volume: nudge now so volume never lags. No double-tap
+                             * decode any more (skip/rewind moved to power multi-tap), so a
+                             * fast repeat of the same key is simply two volume steps. */
                             if (!dry_run && ufd >= 0) uinput_tap(ufd, ie.code);
                             logln("reinject %s", is_up ? "VOLUP" : "VOLDN");
-                            /* double tap of same key within window -> next/prev */
-                            if (vol_pending == ie.code) {
-                                emit(is_up ? "next" : "prev");
-                                vol_pending = 0;
-                                timer_disarm(t_dbl);
-                            } else {
-                                vol_pending = ie.code;
-                                timer_arm(t_dbl, double_tap_ms);
-                            }
                             /* hold-to-ramp: arm the repeat timer; if the key is still
                              * down after the delay it nudges continuously (no combo). */
                             if (!pwr_down) {
@@ -617,7 +613,13 @@ int main(int argc, char **argv) {
                         held_vol = 0;
                         timer_disarm(t_vrep);
                         timer_arm(t_pwr, power_short_ms);
-                        if (vdn_down && !vup_down) timer_arm(t_mode, mode_hold_ms);
+                        if (vdn_down && !vup_down) {
+                            /* mode combo forming -> abandon any pending tap decode so it
+                             * doesn't fire play/pause mid-hold */
+                            pwr_taps = 0;
+                            timer_disarm(t_ptap);
+                            timer_arm(t_mode, mode_hold_ms);
+                        }
                     } else { /* released */
                         pwr_down = 0;
                         logln("key POWER up");
@@ -626,13 +628,24 @@ int main(int argc, char **argv) {
                             if (!dry_run) ioctl(devs[power_idx], EVIOCGRAB, 1);
                             pwr_passthrough = 0;
                             logln("power released: re-grabbed");
+                            pwr_taps = 0;          /* power-menu passthrough cancels taps */
+                            timer_disarm(t_ptap);
                         } else if (pwr_consumed) {
                             timer_disarm(t_pwr);
                             pwr_consumed = 0;
+                            pwr_taps = 0;
+                            timer_disarm(t_ptap);
                         } else if (!pwr_long) {
+                            /* clean short tap: accumulate and (re)arm the multi-tap window.
+                             * Decode fires (TAG_T_PTAP) when it elapses with no further tap:
+                             * 1=play/pause, 2=next, 3+=prev. */
                             timer_disarm(t_pwr);
-                            emit("play_pause");
+                            pwr_taps++;
+                            logln("power tap #%d", pwr_taps);
+                            timer_arm(t_ptap, ptap_ms);
                         } else {
+                            /* long press that wasn't a passthrough (e.g. a volume was also
+                             * down) -> ignore, don't count as a tap */
                             timer_disarm(t_pwr);
                         }
                     }
