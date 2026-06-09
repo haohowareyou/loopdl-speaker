@@ -12,7 +12,7 @@ switch:
   volume. Maximum battery life.
 - **Full-Phone mode** (occasional) — a normal Android phone with all apps back,
   **except** the rainx/Loop apps, which stay permanently disabled so the device never
-  tracks the user or force-enables mic/location.
+  tracks the user or force-enables mic/location. (double check this first, if disbaling rainx/loop app is good enough then great)
 
 Everything must be **reproducible on a stock LoopDL** and shippable as a public,
 personal-data-free git repo (see §9).
@@ -41,8 +41,15 @@ personal-data-free git repo (see §9).
   ondevicepersonalization, turbo, Google app + Assistant + searchselector, Dialer,
   Messaging, Contacts, cellbroadcast). `pm disable-user` in Dumb, `pm enable` in Full.
 
-Switching toggles 31 packages → takes a few seconds; a TTS cue ("Full mode" /
-"Speaker mode") covers the gap since the screen is off.
+Switching toggles the 29 `MODE_TOGGLED` packages (and re-enforces the 3 rainx
+disables) → takes a few seconds; a TTS cue ("Full mode" / "Speaker mode") covers the
+gap since the screen is off.
+
+> **Build-time check (user request):** confirm `pm disable-user --user 0` on the rainx
+> packages is genuinely sufficient for the privacy guarantee (no background
+> service/mic/location survives a disable). If a disabled priv-app can still be woken,
+> escalate to removing the APKs from the overlay (root) instead. Verify with
+> `dumpsys activity processes | grep rainx` + `appops` after a disable.
 
 ## 3. Pairing flow
 
@@ -106,7 +113,9 @@ volume that tracks on both sides (not two multiplied mixers).
 ## 7. Extras (all selected)
 
 - **Voice prompts (TTS)** via Google TTS (kept enabled): "Pairing", "Connected",
-  "Speaker mode" / "Full mode", "Battery N percent".
+  "Speaker mode" / "Full mode", "Battery N percent". All cues play at **half volume**
+  (`CUE_VOLUME_PCT=50`) for now — the user will tune after testing. (The bootloader
+  startup chime itself is LK-level and out of scope here; tracked separately.)
 - **Battery announcement** — on connect and via a gesture → spoken %.
 - **Auto-sleep (two-stage)** — `IDLE_SLEEP_MIN` (5) idle with nothing connected and no
   audio → suspend; `IDLE_OFF_MIN` (15) → full power off. Never triggers during
@@ -129,6 +138,7 @@ A2DP_SINK_PROP="bluetooth.profile.a2dp.sink.enabled"
 GESTURE_PAIR_HOLD_MS=3000
 GESTURE_MODE_HOLD_MS=5000
 DOUBLE_TAP_WINDOW_MS=300
+CUE_VOLUME_PCT=50             # TTS / audio-cue loudness (user will tune)
 ```
 
 ## 9. Distribution & reproducibility
@@ -168,7 +178,7 @@ speaker module is step 4.
 ## 11. Verification plan
 
 Independently testable units:
-1. Mode scripts flip radios + 31 packages correctly; rainx stays disabled.
+1. Mode scripts flip radios + 29 packages correctly; rainx stays disabled.
 2. `getevent` confirms real button codes; gesture map fires correctly; volume instant.
 3. Fresh phone pairs with **zero taps** inside a window; window closes after.
 4. AVRCP play/pause/next/prev control the source phone.
