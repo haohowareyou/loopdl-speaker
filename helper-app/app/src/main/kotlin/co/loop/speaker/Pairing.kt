@@ -37,6 +37,11 @@ class Pairing(val ctx: Context) {
                         .getMethod("setPairingConfirmation", Boolean::class.java)
                         .invoke(d, true)
                     Log.i("LoopSpk", "auto-accepted pairing from ...${d?.address?.takeLast(5)}")
+                    // Suppress the system BluetoothPairingDialog: ACTION_PAIRING_REQUEST is an
+                    // ordered broadcast, so a higher-priority receiver that aborts it stops the
+                    // dialog from ever showing -> truly zero-tap pairing. (BLUETOOTH_PRIVILEGED
+                    // is granted, so we run before the system handler.)
+                    try { abortBroadcast() } catch (_: Exception) {}
                 } catch (e: Exception) {
                     Log.e("LoopSpk", "accept pairing", e)
                 }
@@ -46,11 +51,12 @@ class Pairing(val ctx: Context) {
 
     fun open(seconds: Int) {
         if (!registered) {
-            ctx.registerReceiver(
-                rx,
-                IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST),
-                Context.RECEIVER_EXPORTED
-            )
+            val filter = IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST).apply {
+                // Beat the system pairing handler so we can auto-accept + abort the
+                // dialog. SYSTEM_HIGH_PRIORITY is the max a (privileged) app can request.
+                priority = IntentFilter.SYSTEM_HIGH_PRIORITY
+            }
+            ctx.registerReceiver(rx, filter, Context.RECEIVER_EXPORTED)
             registered = true
         }
         openUntil = SystemClock.elapsedRealtime() + seconds * 1000L
