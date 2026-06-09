@@ -24,6 +24,9 @@ settings put secure bluetooth_name "$DEVICE_NAME"
 # IdleSleep can't because it runs unprivileged). Keep a short timeout as a backstop
 # in case something briefly wakes it (charger insert, etc.). The daemon grabs the
 # power key, so a power tap maps to play/pause and does NOT wake the panel.
+# Also clear "stay awake while plugged in" — a speaker is usually on a charger, and
+# that developer setting (if on) would otherwise keep the panel lit indefinitely.
+settings put global stay_on_while_plugged_in 0
 settings put system screen_off_timeout 10000
 input keyevent 223   # KEYCODE_SLEEP
 
