@@ -12,4 +12,7 @@ GESTURE_PAIR_HOLD_MS=1500     # both volumes held this long = pairing window
 GESTURE_MODE_HOLD_MS=3000     # power + vol-down held this long = mode toggle (->full)
 DOUBLE_TAP_WINDOW_MS=450      # double-tap window for track skip (volume reinjects instantly)
 POWER_SHORT_MS=600           # power tap (<this) = play/pause; hold (>=this) = normal power
+VOL_RAMP_DELAY_MS=500        # hold a volume key this long before it starts ramping
+VOL_RAMP_INTERVAL_MS=120     # while held past the delay, nudge volume every this many ms
+GRAB_TOUCH=1                 # 1 = silence (grab+drop) touchscreen in dumb mode (no screen wake)
 CUE_VOLUME_PCT=50

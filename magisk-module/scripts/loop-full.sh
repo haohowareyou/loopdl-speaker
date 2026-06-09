@@ -24,5 +24,11 @@ loop_set_radio data on
 
 settings put system screen_off_timeout 120000
 settings put secure double_tap_to_wake 1   # restore normal-phone tap-to-wake
+settings put secure wake_gesture_enabled 1
+settings put secure doze_enabled 1
+# re-enable the FocalTech firmware tap-wake gesture for normal phone use
+for g in $(find /sys/devices -name fts_gesture_mode 2>/dev/null); do
+  echo 1 > "$g" 2>/dev/null
+done
 loop_app mode_full
 loop_log "FULL applied"

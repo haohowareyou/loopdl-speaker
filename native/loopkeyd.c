@@ -75,12 +75,16 @@
 #define DEF_POWER_NAME  "mtk-pmic-keys"
 
 #define MAX_DEVS 8
+#define MAX_SIL  4          /* touchscreen / silence devices grabbed-and-dropped */
 
 /* config-tunable thresholds (ms) */
 static long double_tap_ms   = 300;
 static long pair_hold_ms    = 3000;
 static long mode_hold_ms    = 5000;
 static long power_short_ms  = 600;
+static long vol_ramp_delay_ms = 500;   /* hold a volume key this long before ramping */
+static long vol_ramp_int_ms   = 120;   /* then nudge again every this many ms */
+static int  grab_touch        = 1;     /* GRAB_TOUCH: silence touchscreen in dumb mode */
 
 static char cfg_keypad[128] = "";  /* INPUT_KEYPAD from config (device name) */
 static char cfg_power[128]  = "";  /* INPUT_POWER  from config */
@@ -140,6 +144,9 @@ static void load_config(void) {
         cfg_long(line, "GESTURE_PAIR_HOLD_MS", &pair_hold_ms);
         cfg_long(line, "GESTURE_MODE_HOLD_MS", &mode_hold_ms);
         cfg_long(line, "POWER_SHORT_MS", &power_short_ms);
+        cfg_long(line, "VOL_RAMP_DELAY_MS", &vol_ramp_delay_ms);
+        cfg_long(line, "VOL_RAMP_INTERVAL_MS", &vol_ramp_int_ms);
+        { long g = grab_touch; cfg_long(line, "GRAB_TOUCH", &g); grab_touch = (int)g; }
     }
     fclose(f);
 }
@@ -160,6 +167,17 @@ static int is_excluded(int fd, const char *name) {
         if (HASBIT(keys, BTN_TOUCH)) return 1;
     }
     return 0;
+}
+
+/* Returns 1 if the fd is a touchscreen (exposes BTN_TOUCH). These are silenced
+ * (grabbed + dropped) in dumb mode: this MT6877's FocalTech panel injects
+ * KEY_POWER on a firmware tap-wake gesture, which would otherwise reach the
+ * framework and turn the screen on. Grabbing it keeps the panel dark. */
+static int is_touchscreen(int fd) {
+    unsigned long keys[(KEY_MAX / (8 * sizeof(unsigned long))) + 1];
+    memset(keys, 0, sizeof(keys));
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys) < 0) return 0;
+    return HASBIT(keys, BTN_TOUCH);
 }
 
 /* Returns 1 if the device carries any of our button keys and is not excluded. */
@@ -262,6 +280,33 @@ static int collect_button_devs(int *devs, char dev_names[][128], int *power_idx)
     return n;
 }
 
+/* ---- touchscreen discovery: every BTN_TOUCH device, to grab-and-drop ---- */
+static int collect_silence_devs(int *sdevs, char sdev_names[][128]) {
+    int n = 0;
+    DIR *d = opendir("/dev/input");
+    if (!d) return 0;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL && n < MAX_SIL) {
+        if (strncmp(e->d_name, "event", 5) != 0) continue;
+        char path[64];
+        snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
+        int fd = open(path, O_RDONLY | O_NONBLOCK);
+        if (fd < 0) continue;
+        char name[128] = "";
+        ioctl(fd, EVIOCGNAME(sizeof(name)), name);
+        if (is_touchscreen(fd)) {
+            logln("silence -> %s (\"%s\")", path, name);
+            sdevs[n] = fd;
+            snprintf(sdev_names[n], 128, "%s", name);
+            n++;
+        } else {
+            close(fd);
+        }
+    }
+    closedir(d);
+    return n;
+}
+
 /* ---- uinput virtual device for volume re-injection ---- */
 static int uinput_setup(void) {
     int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
@@ -352,6 +397,12 @@ int main(int argc, char **argv) {
     logln("grabbed %d button device(s), power on \"%s\"",
           ndev, dev_names[power_idx]);
 
+    /* touchscreen(s) to silence: grabbed-and-dropped so a firmware tap-wake
+     * gesture can't reach the framework and light the panel in dumb mode. */
+    int sdevs[MAX_SIL];
+    char sdev_names[MAX_SIL][128];
+    int nsil = 0;
+
     int ufd = -1;
     if (!dry_run) {
         for (int i = 0; i < ndev; i++) {
@@ -363,6 +414,20 @@ int main(int argc, char **argv) {
                 return 3;
             }
         }
+        if (grab_touch) {
+            nsil = collect_silence_devs(sdevs, sdev_names);
+            for (int i = 0; i < nsil; i++) {
+                if (ioctl(sdevs[i], EVIOCGRAB, 1) < 0) {
+                    /* non-fatal: lose the no-wake guarantee but keep buttons working */
+                    logln("WARN: EVIOCGRAB failed on touchscreen \"%s\": %s",
+                          sdev_names[i], strerror(errno));
+                    close(sdevs[i]);
+                    sdevs[i] = sdevs[--nsil];
+                    i--;
+                }
+            }
+            logln("silenced %d touchscreen device(s)", nsil);
+        }
         ufd = uinput_setup();
         if (ufd < 0) {
             logln("FATAL: uinput setup failed: %s", strerror(errno));
@@ -370,23 +435,28 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* timers: double-tap window, pair-hold, mode-hold, power long-press */
+    /* timers: double-tap window, pair-hold, mode-hold, power long-press, vol-ramp */
     int t_dbl  = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     int t_pair = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     int t_mode = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     int t_pwr  = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+    int t_vrep = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 
     int ep = epoll_create1(0);
     struct epoll_event ev;
 #define EP_ADD(fd, tag) do { ev.events = EPOLLIN; ev.data.u32 = (tag); \
                              epoll_ctl(ep, EPOLL_CTL_ADD, (fd), &ev); } while (0)
-    /* tags 0..ndev-1 are the grabbed input fds; timers use high tags */
-    enum { TAG_T_DBL = 100, TAG_T_PAIR, TAG_T_MODE, TAG_T_PWR };
+    /* tags 0..ndev-1 are grabbed button fds; TAG_SIL..+nsil are silenced
+     * touchscreens (drained + dropped); timers use high tags. */
+    enum { TAG_SIL = MAX_DEVS, TAG_T_DBL = 100, TAG_T_PAIR, TAG_T_MODE,
+           TAG_T_PWR, TAG_T_VREP };
     for (int i = 0; i < ndev; i++) EP_ADD(devs[i], (uint32_t)i);
+    for (int i = 0; i < nsil; i++) EP_ADD(sdevs[i], (uint32_t)(TAG_SIL + i));
     EP_ADD(t_dbl, TAG_T_DBL);
     EP_ADD(t_pair, TAG_T_PAIR);
     EP_ADD(t_mode, TAG_T_MODE);
     EP_ADD(t_pwr, TAG_T_PWR);
+    EP_ADD(t_vrep, TAG_T_VREP);
 #undef EP_ADD
 
     /* GLOBAL gesture state — keyed by keycode across ALL grabbed devices.
@@ -396,16 +466,42 @@ int main(int argc, char **argv) {
     int pwr_passthrough = 0;    /* grab released on power fd for power menu */
     int pwr_consumed = 0;       /* power was part of mode combo -> no play_pause on release */
     int pwr_long = 0;           /* power held past short threshold -> not a tap */
+    int held_vol = 0;           /* volume key code held for ramp (0 = none) */
 
     while (running) {
-        struct epoll_event evs[8 + MAX_DEVS];
-        int n = epoll_wait(ep, evs, 8 + MAX_DEVS, -1);
+        struct epoll_event evs[8 + MAX_DEVS + MAX_SIL];
+        int n = epoll_wait(ep, evs, 8 + MAX_DEVS + MAX_SIL, -1);
         if (n < 0) {
             if (errno == EINTR) continue;
             break;
         }
         for (int i = 0; i < n; i++) {
             uint32_t tag = evs[i].data.u32;
+
+            /* silenced touchscreen: drain and drop everything (incl. the
+             * firmware tap-wake KEY_POWER) so the panel never lights. */
+            if (tag >= TAG_SIL && tag < TAG_SIL + (uint32_t)nsil) {
+                int sfd = sdevs[tag - TAG_SIL];
+                struct input_event se;
+                while (read(sfd, &se, sizeof(se)) == (ssize_t)sizeof(se)) { /* drop */ }
+                continue;
+            }
+
+            if (tag == TAG_T_VREP) {
+                drain_timer(t_vrep);
+                /* hold-to-ramp: a single volume key held past the delay nudges
+                 * repeatedly until release. Bail if a combo formed meanwhile. */
+                if (held_vol && !pwr_down &&
+                    ((held_vol == KEY_VOLUMEUP   && vup_down && !vdn_down) ||
+                     (held_vol == KEY_VOLUMEDOWN && vdn_down && !vup_down))) {
+                    if (!dry_run && ufd >= 0) uinput_tap(ufd, held_vol);
+                    logln("ramp %s", held_vol == KEY_VOLUMEUP ? "VOLUP" : "VOLDN");
+                    timer_arm(t_vrep, vol_ramp_int_ms);
+                } else {
+                    held_vol = 0;
+                }
+                continue;
+            }
 
             if (tag == TAG_T_DBL) {
                 drain_timer(t_dbl);
@@ -474,7 +570,9 @@ int main(int argc, char **argv) {
                             /* both volumes down -> pair window; if power is also down,
                              * it's the mode combo instead (armed below / in power press). */
                             vol_pending = 0;
+                            held_vol = 0;
                             timer_disarm(t_dbl);
+                            timer_disarm(t_vrep);
                             timer_arm(t_pair, pair_hold_ms);
                             if (pwr_down) timer_arm(t_mode, mode_hold_ms);
                         } else {
@@ -490,12 +588,19 @@ int main(int argc, char **argv) {
                                 vol_pending = ie.code;
                                 timer_arm(t_dbl, double_tap_ms);
                             }
+                            /* hold-to-ramp: arm the repeat timer; if the key is still
+                             * down after the delay it nudges continuously (no combo). */
+                            if (!pwr_down) {
+                                held_vol = ie.code;
+                                timer_arm(t_vrep, vol_ramp_delay_ms);
+                            }
                             /* power + vol-down (EITHER press order) -> mode combo */
                             if (!is_up && pwr_down) timer_arm(t_mode, mode_hold_ms);
                         }
                     } else { /* released */
                         if (is_up) vup_down = 0; else vdn_down = 0;
                         logln("key %s up", is_up ? "VOLUP" : "VOLDN");
+                        if (held_vol == ie.code) { held_vol = 0; timer_disarm(t_vrep); }
                         if (!(vup_down && vdn_down)) {
                             timer_disarm(t_pair);
                         }
@@ -508,6 +613,9 @@ int main(int argc, char **argv) {
                         pwr_down = 1;
                         pwr_long = 0;
                         logln("key POWER down");
+                        /* power joining a held volume = combo forming, not a ramp */
+                        held_vol = 0;
+                        timer_disarm(t_vrep);
                         timer_arm(t_pwr, power_short_ms);
                         if (vdn_down && !vup_down) timer_arm(t_mode, mode_hold_ms);
                     } else { /* released */
@@ -539,8 +647,10 @@ int main(int argc, char **argv) {
             if (i == power_idx && pwr_passthrough) continue; /* already released */
             ioctl(devs[i], EVIOCGRAB, 0);
         }
+        for (int i = 0; i < nsil; i++) ioctl(sdevs[i], EVIOCGRAB, 0);
         if (ufd >= 0) { ioctl(ufd, UI_DEV_DESTROY); close(ufd); }
     }
     for (int i = 0; i < ndev; i++) close(devs[i]);
+    for (int i = 0; i < nsil; i++) close(sdevs[i]);
     return 0;
 }
