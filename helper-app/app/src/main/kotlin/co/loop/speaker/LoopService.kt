@@ -40,6 +40,7 @@ class LoopService : Service() {
     private lateinit var reconnect: Reconnect
     private lateinit var idleSleep: IdleSleep
     private lateinit var volume: Volume
+    private lateinit var tick: Tick
     private var ready = false
     private var dumbMode = false
 
@@ -87,6 +88,7 @@ class LoopService : Service() {
         reconnect = Reconnect(this)
         idleSleep = IdleSleep(this, Config.IDLE_SLEEP_MIN, Config.IDLE_OFF_MIN)
         volume   = Volume(this, avrcp)
+        tick     = Tick(this)
 
         avrcp.init()
         cues.init()
@@ -116,6 +118,8 @@ class LoopService : Service() {
                 dumbMode = true
                 cues.say("Speaker mode")
                 idleSleep.start()
+                tick.start()      // audible volume feedback (screen off)
+                volume.start()    // forward local volume -> phone (single synced slider)
                 // Always silently auto-accept while we're a speaker. Then try to
                 // reconnect the last phone; if that fails, advertise so a new phone
                 // can find us (auto-accept makes the pairing itself codeless).
@@ -130,6 +134,8 @@ class LoopService : Service() {
                 dumbMode = false
                 cues.say("Full mode")
                 idleSleep.stop()
+                tick.stop()
+                volume.stop()
                 pairing.disableAutoAccept()
             }
 
@@ -156,6 +162,8 @@ class LoopService : Service() {
             try { unregisterReceiver(a2dpReceiver) } catch (_: Exception) {}
             pairing.close()
             idleSleep.stop()
+            tick.stop()
+            volume.stop()
             cues.shutdown()
         }
         Log.i(TAG, "service destroy")

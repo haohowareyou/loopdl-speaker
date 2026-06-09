@@ -15,4 +15,4 @@ POWER_SHORT_MS=600           # power tap (<this) = play/pause; hold (>=this) = n
 VOL_RAMP_DELAY_MS=500        # hold a volume key this long before it starts ramping
 VOL_RAMP_INTERVAL_MS=120     # while held past the delay, nudge volume every this many ms
 GRAB_TOUCH=1                 # 1 = silence (grab+drop) touchscreen in dumb mode (no screen wake)
-CUE_VOLUME_PCT=50
+CUE_VOLUME_PCT=30
