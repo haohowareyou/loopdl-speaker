@@ -1,0 +1,35 @@
+# ── Never commit personal or device-identifying data ──
+# Device state dumps (contain settings, eSIM IDs, serials, BT MACs)
+loop-backup/
+snapshot-*/
+*getprop*.txt
+*settings-*.txt
+*esim*.txt
+*packages-*.txt
+
+# ── Never redistribute firmware (copyright rainx / OEM) ──
+*.img
+*.img.xz
+*.bin
+*.tar.zst
+stock-firmware/
+staging/
+bootanimation.zip
+
+# ── Signing keys / secrets ──
+*.keystore
+*.jks
+*.pem
+keys/
+local.properties
+
+# ── Build / tooling artifacts ──
+mtkclient/
+*.apk
+build/
+.gradle/
+*.zip
+!*-template.zip
+
+# ── OS noise ──
+.DS_Store
