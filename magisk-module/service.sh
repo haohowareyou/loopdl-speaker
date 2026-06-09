@@ -13,6 +13,23 @@ for p in BLUETOOTH_CONNECT BLUETOOTH_SCAN BLUETOOTH_ADVERTISE; do
   pm grant co.loop.speaker "android.permission.$p" 2>/dev/null
 done
 
+# Force AVRCP Controller (CT) role for the sink speaker. The bluetooth.profile.* props
+# are re-asserted by the BT stack at its OWN init stage (after post-fs-data), so setting
+# them early doesn't stick — they must be set here (late_start) and the stack bounced.
+# CT lets the speaker SEND play/pause/next/prev to the phone and enables absolute-volume
+# (one synced slider); the ROM-default Target role breaks both. The app bound the wrong
+# (Target/absent-Controller) profile at its startup, so restart it after the bounce to
+# bind the now-available AvrcpControllerService.
+resetprop bluetooth.profile.avrcp.controller.enabled true
+resetprop bluetooth.profile.avrcp.target.enabled false
+resetprop persist.bluetooth.disableabsvol false
+if [ "$(getprop bluetooth.profile.avrcp.controller.enabled)" = true ]; then
+  svc bluetooth disable; sleep 2
+  am force-stop com.android.bluetooth; sleep 1
+  svc bluetooth enable; sleep 3
+  am force-stop co.loop.speaker; sleep 1
+fi
+
 sh "$MODDIR/scripts/loop-mode" dumb
 # daemon supervisor (added in Phase 3; guarded so Phase 1 zip is valid)
 [ -x "$MODDIR/system/bin/loopkeyd" ] && sh "$MODDIR/scripts/loopkeyd.sh" &

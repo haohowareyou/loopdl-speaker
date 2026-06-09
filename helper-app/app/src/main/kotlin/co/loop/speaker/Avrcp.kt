@@ -4,22 +4,26 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.media.AudioManager
 import android.util.Log
+import android.view.KeyEvent
 
 /**
- * Wraps the hidden BluetoothAvrcpController profile (id=12) via reflection.
- * Used for passthrough transport control: play/pause/next/prev.
- * Also exposes setAbsoluteVolume for the Volume bridge fallback (Task 11).
+ * Transport control + absolute volume for the connected AVRCP player (the phone).
  *
- * AVRCP passthrough keycodes (AVRCP 1.3 §25.19):
- *   PLAY   = 0x44
- *   PAUSE  = 0x46  (also used as toggle — most sources treat PAUSE as play/pause toggle)
- *   FORWARD (next)  = 0x4B
- *   BACKWARD (prev) = 0x4C
+ * Transport (play/pause/next/prev) is sent via AudioManager.dispatchMediaKeyEvent:
+ * when the loop is an AVRCP Controller (CT) with a connected source, the BT stack
+ * publishes the remote player as the active MediaSession, so a dispatched media key
+ * is forwarded to the phone over AVRCP. (BluetoothAvrcpController.sendPassThroughCmd
+ * was removed from AOSP by Android 15 — reflection on it throws NoSuchMethod.)
+ *
+ * We still bind BluetoothAvrcpController (profile 12) for setAbsoluteVolume (used by
+ * the optional Volume bridge) and connection-state visibility.
  */
 class Avrcp(val ctx: Context) {
     private var ctrl: BluetoothProfile? = null
     private val AVRCP_CONTROLLER = 12
+    private val am = ctx.getSystemService(AudioManager::class.java)
 
     fun init() {
         BluetoothAdapter.getDefaultAdapter().getProfileProxy(
@@ -41,27 +45,24 @@ class Avrcp(val ctx: Context) {
     private fun connectedDevice(): BluetoothDevice? = ctrl?.connectedDevices?.firstOrNull()
 
     /**
-     * Sends a passthrough command (press + release) to the connected source device.
-     * Uses reflection on the hidden BluetoothAvrcpController.sendPassThroughCmd method.
+     * Dispatches a media key (down + up) to the active MediaSession, which the BT stack
+     * routes to the connected AVRCP player (the phone). Works regardless of whether a
+     * controller proxy/connected-device is visible to us — routing is handled by the
+     * framework's media session service.
      */
-    fun send(key: Int) {
-        val c = ctrl ?: run { Log.i("LoopSpk", "avrcp: no controller proxy"); return }
-        val d = connectedDevice() ?: run { Log.i("LoopSpk", "avrcp: no connected device"); return }
+    private fun mediaKey(code: Int) {
         try {
-            val m = c.javaClass.getMethod(
-                "sendPassThroughCmd",
-                BluetoothDevice::class.java, Int::class.java, Int::class.java
-            )
-            m.invoke(c, d, key, 0) // key pressed
-            m.invoke(c, d, key, 1) // key released
-            Log.i("LoopSpk", "avrcp key=0x${key.toString(16)} -> ${d.address}")
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+            Log.i("LoopSpk", "media key=$code dispatched")
         } catch (e: Exception) {
-            Log.e("LoopSpk", "avrcp send key=0x${key.toString(16)}", e)
+            Log.e("LoopSpk", "media key=$code", e)
         }
     }
 
-    /** Play/pause toggle — sends PAUSE (0x46); most A2DP sources treat it as toggle. */
-    fun playPause() = send(0x46)
+    fun playPause() = mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+    fun next()      = mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
+    fun prev()      = mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
 
     /**
      * Forward absolute volume (0–127) to the source device via the hidden

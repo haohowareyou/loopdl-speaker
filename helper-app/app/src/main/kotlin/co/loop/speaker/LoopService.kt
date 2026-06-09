@@ -146,8 +146,8 @@ class LoopService : Service() {
             }
 
             "play_pause" -> avrcp.playPause()
-            "next"       -> avrcp.send(0x4B)
-            "prev"       -> avrcp.send(0x4C)
+            "next"       -> avrcp.next()
+            "prev"       -> avrcp.prev()
 
             "battery"    -> cues.battery()
             "say"        -> arg?.let { cues.say(it) }

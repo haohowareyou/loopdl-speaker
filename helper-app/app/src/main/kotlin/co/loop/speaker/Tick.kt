@@ -44,7 +44,9 @@ class Tick(val ctx: Context) {
                 tg = ToneGenerator(AudioManager.STREAM_MUSIC, bucket)
                 lastBucket = bucket
             }
-            tg?.startTone(ToneGenerator.TONE_PROP_BEEP, 40)
+            // Soft, purpose-built volume-key feedback tone (low single pip) instead of
+            // the sharp dual-tone PROP_BEEP. ~30ms keeps it a quick blip per step.
+            tg?.startTone(ToneGenerator.TONE_CDMA_KEYPAD_VOLUME_KEY_LITE, 30)
         } catch (e: Exception) {
             Log.e("LoopSpk", "tick", e)
         }
