@@ -11,10 +11,12 @@ object Config {
     private const val TAG = "LoopSpk"
     private const val PATH = "/data/adb/loop-speaker-mode/config"
 
-    // Defaults match config.default in the magisk module
+    // Defaults match config.default in the magisk module. NOTE: the config file
+    // lives under /data/adb (root-only, mode 700) so this unprivileged app cannot
+    // read it — these compiled defaults are the effective values for the app.
     var PAIR_INITIAL: Int = 180
     var PAIR_RETRIGGER: Int = 60
-    var CUE_VOLUME_PCT: Int = 50
+    var CUE_VOLUME_PCT: Int = 30
     var IDLE_SLEEP_MIN: Int = 5
     var IDLE_OFF_MIN: Int = 15
 
