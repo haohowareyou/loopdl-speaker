@@ -16,3 +16,6 @@ done
 sh "$MODDIR/scripts/loop-mode" dumb
 # daemon supervisor (added in Phase 3; guarded so Phase 1 zip is valid)
 [ -x "$MODDIR/system/bin/loopkeyd" ] && sh "$MODDIR/scripts/loopkeyd.sh" &
+# root-side IPC poller: executes app requests (QS tile -> dumb, idle sleep/poweroff)
+# that the unprivileged helper app drops as trigger files. Runs in both modes.
+sh "$MODDIR/scripts/loop-ipc.sh" &
