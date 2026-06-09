@@ -19,17 +19,19 @@ switch back to a full Android phone.
 
 ## The walkthrough (stock → speaker)
 
-1. [Unlock the bootloader](docs/) — MediaTek BROM via mtkclient. **Key gotcha:**
+1. [Unlock the bootloader](docs/01-unlock.md) — MediaTek BROM via mtkclient. **Key gotcha:**
    connect in *preloader* mode (no buttons), not BROM mode, or stage-2 hangs on DRAM.
-2. [Root with Magisk](docs/)
-3. [Debloat](docs/)
-4. [Install the speaker module](docs/)
+2. [Root with Magisk](docs/02-root.md)
+3. [Debloat](docs/03-debloat.md)
+4. [Install the speaker module](docs/04-speaker-mode.md)
+
+Also: [Recovery](docs/recovery.md) | [Compatibility](docs/compatibility.md)
 
 ## ⚠️ Will this work on *my* LoopDL?
 
 Validated on early units where the **BROM is fully unauthenticated**. Before trusting
 the unlock, verify your own with `mtk printgpt` — see
-[`docs/compatibility.md`](docs/). The speaker module itself is generic Android +
+[`docs/compatibility.md`](docs/compatibility.md). The speaker module itself is generic Android +
 config; only the unlock is unit-sensitive.
 
 ## License

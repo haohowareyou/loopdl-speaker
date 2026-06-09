@@ -17,7 +17,7 @@ This is on-device root + hardware work; classic host-side TDD does not apply. Th
 - **Shell:** every script passes `shellcheck`, then a concrete on-device `adb` verification with expected output.
 - **Native:** compiles clean, then on-device behavioral check via `getevent`/`logcat`.
 - **App:** each feature is exercised by an `adb shell am broadcast`/`am start` trigger with a `logcat` assertion (the app logs a tagged line per action).
-- A task is "done" only when its verification command shows the expected output **on the device** (serial `WTFMGBD3PCA000482`, model `theloop`).
+- A task is "done" only when its verification command shows the expected output **on the device** (model `theloop`; use your own serial from `adb get-serialno`).
 
 Keep `adb logcat -s LoopSpk:* loopkeyd:*` running in a side terminal during execution.
 
@@ -988,7 +988,7 @@ git commit -m "feat(native): supervisor + action dispatcher; mode-aware grab on/
 
 - [ ] **Step 1: Write each doc** from the already-completed work — content sourced from the memory file `loopdl-device-state.md` (unlock via preloader mode, root via fastboot init_boot, debloat sets, snapshot/rollback). `04-speaker-mode.md` = install + button reference + config table. `compatibility.md` = BROM-open caveat + `mtk printgpt` self-check + discovered input codes. `recovery.md` = module disable, uninstall.sh, return-to-stock via snapshot. **Placeholders for serials/MACs** — no personal data.
 
-- [ ] **Step 2: Verify** — `grep -rIE 'WTFMGBD3PCA000482|([0-9A-F]{2}:){5}' docs/ README.md` → no matches (no serial/MAC leaked). Markdown links resolve.
+- [ ] **Step 2: Verify** — `grep -rIE "$(adb get-serialno)"'|([0-9A-F]{2}:){5}' docs/ README.md` → no matches (no serial/MAC leaked). Markdown links resolve.
 
 - [ ] **Step 3: Commit**
 
