@@ -6,12 +6,17 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import java.io.File
 
 /**
  * Two-stage auto-sleep:
  *   1. After IDLE_SLEEP_MIN minutes of inactivity (no music, no A2DP connection) →
- *      suspend via `input keyevent 223` (KEYCODE_SLEEP).
- *   2. After IDLE_OFF_MIN minutes → power off via `svc power shutdown`.
+ *      blank the panel (KEYCODE_SLEEP).
+ *   2. After IDLE_OFF_MIN minutes → power off.
+ *
+ * The app is unprivileged: `input keyevent` / `svc power shutdown` fail from the app
+ * uid (no permission, no su). Instead we drop a trigger file in filesDir; the root
+ * IPC poller (loop-ipc.sh) executes the actual keyevent/shutdown as root.
  *
  * Activity sources that call poke():
  *   - A2DP connect/disconnect broadcasts (LoopService)
@@ -29,6 +34,15 @@ class IdleSleep(val ctx: Context, val sleepMin: Int, val offMin: Int) {
     fun poke() {
         last = SystemClock.elapsedRealtime()
         sleeping = false
+    }
+
+    /** Drop a trigger file in filesDir for the root IPC poller (loop-ipc.sh) to execute. */
+    private fun signalRoot(name: String) {
+        try {
+            File(ctx.filesDir, name).writeText("1")
+        } catch (e: Exception) {
+            Log.e("LoopSpk", "signalRoot $name failed", e)
+        }
     }
 
     fun start() {
@@ -56,14 +70,12 @@ class IdleSleep(val ctx: Context, val sleepMin: Int, val offMin: Int) {
                 when {
                     idleMin >= offMin -> {
                         Log.i("LoopSpk", "idle->poweroff idleMin=$idleMin")
-                        try { Runtime.getRuntime().exec(arrayOf("su", "-c", "svc power shutdown")) }
-                        catch (e: Exception) { Log.e("LoopSpk", "poweroff", e) }
+                        signalRoot("req_poweroff")
                     }
                     idleMin >= sleepMin -> {
                         if (!sleeping) {
                             Log.i("LoopSpk", "idle->sleep idleMin=$idleMin")
-                            try { Runtime.getRuntime().exec(arrayOf("input", "keyevent", "223")) } // KEYCODE_SLEEP
-                            catch (e: Exception) { Log.e("LoopSpk", "sleep", e) }
+                            signalRoot("req_sleep")
                             sleeping = true
                         }
                     }
