@@ -20,12 +20,16 @@
  * "both volumes held" work even when the events arrive on different fds.
  *
  * Gestures (thresholds read from config, defaults below):
- *   vol+/vol- single tap        -> re-inject (instant volume)
+ *   vol+/vol- single tap        -> re-inject (volume) after DOUBLE_TAP_WINDOW_MS decode delay
  *   vol+/vol- double tap        -> "next" / "prev"   (within DOUBLE_TAP_WINDOW_MS)
  *   power short press (<600ms)   -> "play_pause"
- *   power long press             -> release grab on the power fd / pass through
+ *   power long press (no vol)    -> release grab on power fd / pass through
  *   both volumes held            -> "pair_open"   (GESTURE_PAIR_HOLD_MS)
- *   all three held               -> "mode_toggle" (GESTURE_MODE_HOLD_MS)
+ *   power + vol-down held        -> "mode_toggle" (GESTURE_MODE_HOLD_MS)  [-> full mode]
+ *
+ * Volume is decoded with a short delay (DOUBLE_TAP_WINDOW_MS): on the first press we
+ * do NOT act, so that a second key (other volume = combo, or same key = double tap)
+ * can be recognised first. A lone press fires the volume nudge when the window expires.
  *
  * Key codes: KEY_VOLUMEUP=115, KEY_VOLUMEDOWN=114, KEY_POWER=116.
  *
@@ -387,10 +391,10 @@ int main(int argc, char **argv) {
     /* GLOBAL gesture state — keyed by keycode across ALL grabbed devices.
      * VOLUMEUP and VOLUMEDOWN can arrive on different fds; combos still work. */
     int vup_down = 0, vdn_down = 0, pwr_down = 0;
-    int pending_dbl = 0;        /* a volume key awaiting its second tap */
-    int pending_code = 0;       /* which volume key is pending */
+    int vol_pending = 0;        /* a volume key code awaiting decode (0 = none) */
     int pwr_passthrough = 0;    /* grab released on power fd for power menu */
-    int pwr_consumed = 0;       /* power was part of a combo -> no play_pause on release */
+    int pwr_consumed = 0;       /* power was part of mode combo -> no play_pause on release */
+    int pwr_long = 0;           /* power held past short threshold -> not a tap */
 
     while (running) {
         struct epoll_event evs[8 + MAX_DEVS];
@@ -404,10 +408,14 @@ int main(int argc, char **argv) {
 
             if (tag == TAG_T_DBL) {
                 drain_timer(t_dbl);
-                /* window closed without a second tap: it was a single tap.
-                 * Volume was already re-injected on press, so just clear. */
-                pending_dbl = 0;
-                pending_code = 0;
+                /* decode window closed with no second key: a lone volume tap.
+                 * Re-inject the nudge now (delayed-volume). */
+                if (vol_pending) {
+                    if (!dry_run && ufd >= 0) uinput_tap(ufd, vol_pending);
+                    else logln("dry: reinject %s",
+                               vol_pending == KEY_VOLUMEUP ? "VOLUP" : "VOLDOWN");
+                    vol_pending = 0;
+                }
                 continue;
             }
             if (tag == TAG_T_PAIR) {
@@ -417,14 +425,16 @@ int main(int argc, char **argv) {
                  * of mode); let t_mode handle it instead of firing pairing here. */
                 if (vup_down && vdn_down && !pwr_down) {
                     emit("pair_open");
-                    /* consume: cancel any pending single/double for these keys */
-                    pending_dbl = 0;
+                    /* consume: cancel any pending single-volume decode */
+                    vol_pending = 0;
                 }
                 continue;
             }
             if (tag == TAG_T_MODE) {
                 drain_timer(t_mode);
-                if (vup_down && vdn_down && pwr_down) {
+                /* mode = POWER + VOL-DOWN held for mode_hold_ms (NOT vol-up: that
+                 * combo is the PMIC hardware reboot we can't intercept). */
+                if (pwr_down && vdn_down && !vup_down) {
                     emit("mode_toggle");
                     pwr_consumed = 1;  /* don't fire play_pause when power is released */
                 }
@@ -432,11 +442,11 @@ int main(int argc, char **argv) {
             }
             if (tag == TAG_T_PWR) {
                 drain_timer(t_pwr);
-                /* power held past short-press threshold -> long press.
-                 * Release grab on the power fd so firmware power menu works.
-                 * (This momentarily frees VOLUMEUP too, since it shares the
-                 * mtk-pmic-keys device — acceptable; re-grabbed on release.) */
-                if (pwr_down && !(vup_down && vdn_down)) {
+                pwr_long = 1;  /* power is now a long press, not a tap */
+                /* power long-press with NO volume down -> hand the power menu to
+                 * firmware by releasing the grab on the power fd. If any volume is
+                 * down we're forming the mode combo; do nothing. */
+                if (pwr_down && !vup_down && !vdn_down) {
                     logln("power long-press: passthrough");
                     if (!dry_run && !pwr_passthrough) {
                         ioctl(devs[power_idx], EVIOCGRAB, 0);
@@ -460,60 +470,56 @@ int main(int argc, char **argv) {
                 if (ie.code == KEY_VOLUMEUP || ie.code == KEY_VOLUMEDOWN) {
                     int is_up = (ie.code == KEY_VOLUMEUP);
                     if (pressed) {
+                        int other_down = is_up ? vdn_down : vup_down;
                         if (is_up) vup_down = 1; else vdn_down = 1;
 
-                        if (vup_down && vdn_down) {
-                            /* both volumes (possibly across two fds): candidate
-                             * for pair / mode combos */
+                        if (other_down) {
+                            /* both volumes down -> pair/mode combo candidate.
+                             * Cancel any pending single-volume decode. */
+                            vol_pending = 0;
+                            timer_disarm(t_dbl);
                             timer_arm(t_pair, pair_hold_ms);
                             if (pwr_down) timer_arm(t_mode, mode_hold_ms);
-                            /* don't treat as volume nudge while combo forming */
-                            pending_dbl = 0;
+                        } else if (vol_pending == ie.code) {
+                            /* second tap of the same key within the window -> next/prev */
+                            emit(is_up ? "next" : "prev");
+                            vol_pending = 0;
+                            timer_disarm(t_dbl);
                         } else {
-                            /* single volume press: instant re-inject now */
-                            if (!dry_run && ufd >= 0) uinput_tap(ufd, ie.code);
-                            else logln("dry: reinject %s",
-                                       is_up ? "VOLUP" : "VOLDOWN");
-                            /* double-tap detection */
-                            if (pending_dbl && pending_code == ie.code) {
-                                emit(is_up ? "next" : "prev");
-                                pending_dbl = 0;
-                                pending_code = 0;
-                                timer_disarm(t_dbl);
-                            } else {
-                                pending_dbl = 1;
-                                pending_code = ie.code;
-                                timer_arm(t_dbl, double_tap_ms);
-                            }
+                            /* first press: defer. Decode on t_dbl expiry or a 2nd key. */
+                            vol_pending = ie.code;
+                            timer_arm(t_dbl, double_tap_ms);
                         }
                     } else { /* released */
                         if (is_up) vup_down = 0; else vdn_down = 0;
                         if (!(vup_down && vdn_down)) {
                             timer_disarm(t_pair);
+                        }
+                        if (!(pwr_down && vdn_down)) {
                             timer_disarm(t_mode);
                         }
                     }
                 } else if (ie.code == KEY_POWER) {
                     if (pressed) {
                         pwr_down = 1;
+                        pwr_long = 0;
                         timer_arm(t_pwr, power_short_ms);
-                        if (vup_down && vdn_down) timer_arm(t_mode, mode_hold_ms);
+                        if (vdn_down && !vup_down) timer_arm(t_mode, mode_hold_ms);
                     } else { /* released */
                         pwr_down = 0;
                         timer_disarm(t_mode);
                         if (pwr_passthrough) {
-                            /* re-grab the power fd after the passthrough event */
                             if (!dry_run) ioctl(devs[power_idx], EVIOCGRAB, 1);
                             pwr_passthrough = 0;
                             logln("power released: re-grabbed");
                         } else if (pwr_consumed) {
-                            /* power was part of the mode-toggle combo, not a tap */
                             timer_disarm(t_pwr);
                             pwr_consumed = 0;
-                        } else {
-                            /* released before long-press fired -> short press */
+                        } else if (!pwr_long) {
                             timer_disarm(t_pwr);
                             emit("play_pause");
+                        } else {
+                            timer_disarm(t_pwr);
                         }
                     }
                 }
