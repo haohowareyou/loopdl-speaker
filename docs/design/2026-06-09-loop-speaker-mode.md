@@ -26,7 +26,7 @@ personal-data-free git repo (see §9).
 | NFC / location | OFF | restored |
 | Screen | forced off, kept dark | normal |
 | Bluetooth | ON + A2DP sink + auto-pair flow | ON, not auto-discoverable |
-| `MODE_TOGGLED` apps (31) | disabled | **enabled** |
+| `MODE_TOGGLED` apps (29) | disabled | **enabled** |
 | `PERMANENT_DISABLE` apps (rainx, 3) | disabled | **disabled (always)** |
 | Button daemon | active (speaker gestures) | released (normal phone buttons) |
 | Auto-sleep | 5 min → suspend, 15 min → power off | normal Android timeout |
@@ -35,7 +35,7 @@ personal-data-free git repo (see §9).
 - `PERMANENT_DISABLE` = `co.rainx.loop.launcher`, `co.rainx.loop.setup`,
   `vendor.rainx.setupwizard.overlay`. Never enabled in either mode. This is the
   privacy guarantee: rainx code cannot run, so no always-on mic/location/tracking.
-- `MODE_TOGGLED` = the 31 non-rainx apps debloated for speaker use (Chrome, Gmail,
+- `MODE_TOGGLED` = the 29 non-rainx apps debloated for speaker use (Chrome, Gmail,
   Maps, Photos, Docs, YouTube/Music/Kids, Videos, Calendar, Files, Meet, Wellbeing,
   Health, SafetyHub, ADM, Restore, carrierwifi, federatedcompute,
   ondevicepersonalization, turbo, Google app + Assistant + searchselector, Dialer,
