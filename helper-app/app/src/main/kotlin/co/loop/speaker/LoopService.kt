@@ -50,6 +50,7 @@ class LoopService : Service() {
     private lateinit var volume: Volume
     private lateinit var tick: Tick
     private lateinit var battery: BatteryWatch
+    private lateinit var panGuard: PanGuard
     private val keepAlive = AudioKeepAlive()
     private var ready = false
     private var dumbMode = false
@@ -89,7 +90,14 @@ class LoopService : Service() {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
                     Log.i(TAG, "ACL connected")
                     idleSleep.poke()
-                    if (dumbMode && dev != null) confirmConnected(dev, 0)
+                    if (dumbMode && dev != null) {
+                        // Forbid PAN the instant the phone links (reliable — uses the event's
+                        // device, not the flaky bondedDevices cache), so it can never bring up
+                        // Bluetooth tethering. Policy doesn't persist, so this re-asserts each
+                        // connect.
+                        panGuard.forbid(dev)
+                        confirmConnected(dev, 0)
+                    }
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     Log.i(TAG, "ACL disconnected")
@@ -112,6 +120,7 @@ class LoopService : Service() {
         pairing.disconnectOthers(dev)     // single source: newest phone wins
         tones.connected()
         battery.alertIfLow()              // queued after "Connected" if the pack is low
+        panGuard.forbid(dev)              // never let this phone share data over BT-PAN
     }
 
     /** Debounced + collapsed: a brief drop+reconnect (or an auto-kicked older phone)
@@ -226,6 +235,7 @@ class LoopService : Service() {
         // onEdge: distinct "limit" earcon when volume tops out / bottoms out.
         tick     = Tick(this, { touchAmp() }, { tones.edge() })
         battery  = BatteryWatch(this, tones)
+        panGuard = PanGuard(this)   // block BT-PAN (phone's data over Bluetooth) — audio only
 
         avrcp.init()
         cues.init()
@@ -233,6 +243,7 @@ class LoopService : Service() {
         // Bind the A2DP-Sink profile proxy (id 11), retrying past the boot BT bounce, so
         // confirmConnected()/a2dpState() can read the real per-device connection state.
         bindSinkProxy()
+        panGuard.start()   // bind PAN proxy + forbid PAN for existing bonds once up
 
         val filter = IntentFilter().apply {
             addAction(ACTION_SINK_STATE)
@@ -261,6 +272,7 @@ class LoopService : Service() {
                 tones.speaker()
                 idleSleep.start()
                 battery.start()   // proactive low-battery warnings + graceful shutdown
+                panGuard.forbidAll()  // re-assert: no phone data over BT-PAN in speaker mode
                 tick.start()      // audible volume feedback (screen off)
                 volume.start()    // forward local volume -> phone (single synced slider)
                 // Always silently auto-accept while we're a speaker. Then try to
@@ -322,6 +334,7 @@ class LoopService : Service() {
             pairing.close()
             idleSleep.stop()
             battery.stop()
+            panGuard.stop()
             tick.stop()
             volume.stop()
             cues.shutdown()

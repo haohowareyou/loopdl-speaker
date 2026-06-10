@@ -30,6 +30,24 @@
         <action android:name="android.service.quicksettings.action.QS_TILE"/>
       </intent-filter>
     </service>
+    <service android:name=".DataTile"
+             android:exported="true"
+             android:icon="@android:drawable/ic_menu_compass"
+             android:label="Mobile Data"
+             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE"/>
+      </intent-filter>
+    </service>
+    <service android:name=".HotspotTile"
+             android:exported="true"
+             android:icon="@android:drawable/ic_menu_share"
+             android:label="Hotspot"
+             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE"/>
+      </intent-filter>
+    </service>
     <activity android:name=".ConfirmSpeakerActivity"
               android:exported="false"
               android:excludeFromRecents="true"

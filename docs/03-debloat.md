@@ -1,8 +1,8 @@
 # Step 3: Debloat
 
-After rooting, disable the packages that are unwanted for a speaker use-case. The
-module manages this automatically once installed, but this step documents the
-reasoning and how to reverse it if something breaks.
+After rooting, disable or remove packages that are unwanted for a speaker use-case.
+The speaker module manages the toggle list automatically once installed; this page
+documents the package strategy and how to manage the permanent rainx removals.
 
 ---
 
@@ -10,17 +10,30 @@ reasoning and how to reverse it if something breaks.
 
 Packages are split into two lists, both under `magisk-module/scripts/`:
 
-### Permanent disables (3 packages) — `packages-permanent-disable.txt`
+### Permanent removes (3 packages) — `packages-permanent-disable.txt`
 
-These are disabled in **both** Dumb-Speaker and Full-Phone mode. They are never
-re-enabled by the module. This is the privacy guarantee: rainx OEM code cannot run,
-so no always-on mic, location, or tracking is possible.
+These are permanently removed (uninstalled for user 0) in **both** Dumb-Speaker and
+Full-Phone mode. They are never re-enabled by the module. This is the privacy
+guarantee: rainx OEM code cannot run, so no always-on mic, location, or tracking is
+possible.
 
 ```
 co.rainx.loop.launcher
 co.rainx.loop.setup
 vendor.rainx.setupwizard.overlay
 ```
+
+`tools/loop-debloat.sh` manages these:
+
+```bash
+tools/loop-debloat.sh status   # show current install state
+tools/loop-debloat.sh remove   # uninstall all 3 for user 0
+tools/loop-debloat.sh restore  # reinstall from system APK (reversible)
+```
+
+`remove` uses `pm uninstall --user 0` — the system APK stays on the read-only
+partition, so `restore` can bring them back. The packages are **currently removed**
+on this unit.
 
 ### Toggled packages (29 packages) — `packages-toggled.txt`
 
@@ -99,8 +112,7 @@ dumpsys bluetooth_manager | grep -A2 'A2DP Sink'
 ### Persistence across reboots
 
 The module installs a `post-fs-data.d` script that sets these props **before** the
-Bluetooth stack starts on every boot. This means the force-stop trick is only needed
-once manually; after that, a clean boot brings the sink up automatically.
+Bluetooth stack starts on every boot. A clean boot brings the sink up automatically.
 
 The persistence script lives at:
 ```
@@ -108,22 +120,6 @@ The persistence script lives at:
 ```
 
 and is installed by the Magisk module in [step 4](04-speaker-mode.md).
-
----
-
-## Applying the debloat manually (without the module)
-
-If you want to apply the package state before installing the module:
-
-```bash
-adb shell su -c 'pm disable-user --user 0 co.rainx.loop.launcher'
-adb shell su -c 'pm disable-user --user 0 co.rainx.loop.setup'
-adb shell su -c 'pm disable-user --user 0 vendor.rainx.setupwizard.overlay'
-# ... and so on for the toggled list
-```
-
-The module's `uninstall.sh` re-enables the toggled packages on removal, so you can
-always get back.
 
 ---
 

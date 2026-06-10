@@ -5,7 +5,7 @@ The `loop-speaker-mode` Magisk module is the core of this project. It provides:
 - Boot-time enforcement of Dumb-Speaker mode
 - Hardware button gesture handling via `loopkeyd`
 - The helper app (`co.loop.speaker`) for Bluetooth pairing, AVRCP transport, volume,
-  TTS cues, auto-reconnect, and auto-sleep
+  audio earcons, auto-reconnect, and auto-sleep
 - A single config file you can edit to tune the device
 
 ---
@@ -39,22 +39,28 @@ Bluetooth open for pairing.
 | WiFi | OFF | ON |
 | NFC / location | OFF | restored |
 | Screen | powered off on entry (10 s backstop timeout) | normal |
-| Bluetooth | ON — A2DP sink, auto-pair | ON — not auto-discoverable |
+| Bluetooth | ON — A2DP sink, auto-pair, **BT PAN forbidden** | ON — not auto-discoverable |
 | 29 toggled apps | disabled | enabled |
 | 3 rainx apps | **always disabled** | **always disabled** |
-| Launcher (home) | n/a (screen off) | Lawnchair |
+| Launcher (home) | n/a (screen off) | Lawnchair (dock: Firefox/Camera/Settings/Play Store) |
 | Button daemon | active (speaker gestures) | released (normal Android) |
+| Quick Settings | — | Mobile Data + Hotspot tiles |
+| Do-Not-Disturb | alarms-only (phone notifications silent) | lifted |
 | Auto-sleep | 5 min → screen off, 15 min → power off | standard Android timeout |
 
 Auto-sleep is driven by the helper app (it knows when music is playing) but executed by
 root: the app is unprivileged and cannot blank/shut down the device itself, so it drops a
 trigger file in its `filesDir` that the root IPC poller (`loop-ipc.sh`) acts on.
 
+**Bluetooth PAN is forbidden per connected device** in Dumb mode — the speaker never
+uses the phone's data over Bluetooth. Audio only.
+
 The 3 rainx packages are permanently disabled in both modes. This is intentional —
 rainx code never runs on this device regardless of mode.
 
-Switching modes takes a few seconds while the 29 packages are toggled. A TTS cue
-("Speaker mode" / "Full mode") plays to bridge the gap since the screen is off.
+Switching modes takes a few seconds while the 29 packages are toggled. A musical earcon
+(low two-note pair for Dumb / high two-note pair for Full) plays to bridge the gap since
+the screen is off.
 
 ---
 
@@ -66,16 +72,16 @@ Switching modes takes a few seconds while the 29 packages are toggled. A TTS cue
 | Vol− tap | Volume down |
 | Vol+ double-tap | Next track (AVRCP passthrough to source phone) |
 | Vol− double-tap | Previous track |
-| Power tap (< 600 ms) | Play / pause (AVRCP) |
-| Power hold (no volume) | Normal power menu (grab released to firmware) |
-| Both volumes held 1.5 s | Open pairing window (60 s) |
-| **Power + Vol− held 5 s** | Switch Dumb → Full |
+| Power tap (release) | Play / pause (AVRCP); also emits a soft "wake" earcon |
+| **Power hold alone ~2.5 s** | **Shutdown** (power-off earcon, then powers off — no firmware power menu in Dumb mode) |
+| Both volumes held 3 s | Open pairing window (60 s) |
+| **Power + Vol− held 3 s** | Switch Dumb → Full |
 
-**Delayed-volume decode:** a single volume press is deferred by `DOUBLE_TAP_WINDOW_MS`
-(default 300 ms) before it acts, so the daemon can first tell apart a second key — the
-other volume (a combo) or the same volume again (a double-tap for track skip). This adds
-~300 ms of latency to a lone volume nudge but makes the both-volumes pairing combo
-reliable (it no longer mis-fires as next/prev). Combos are recognised instantly.
+**Delayed-volume decode:** a single volume press is deferred by `VOL_DOUBLETAP_MS`
+(default 280 ms) before it acts, so the daemon can first tell apart a second tap of the
+same key (a double-tap for track skip). This adds ~280 ms of latency to a lone volume
+nudge but makes double-tap skip reliable. The both-volumes pairing combo is recognised
+instantly (no inter-key delay applied to combos).
 
 **Why Power + Vol−, not all three:** a long **Power + Vol-Up** hold triggers the MT6877
 PMIC hardware force-reboot *below the OS* — the daemon can't intercept it. The mode
@@ -101,11 +107,11 @@ and runs `loop-mode dumb`. A full power-off/on also always boots back to Dumb (s
 ## Pairing flow
 
 1. Boot → Dumb mode → **silent auto-reconnect** to the last paired phone.
-2. If reconnect fails → pairing window opens automatically for `PAIR_INITIAL` (180 s).
-   TTS says "Pairing".
-3. Phone connects → TTS says "Connected", window closes immediately (no longer
-   discoverable).
-4. **Both volumes held 1.5 s** at any time → reopen the window for `PAIR_RETRIGGER`
+2. If reconnect fails → pairing window opens automatically for `PAIR_INITIAL` (60 s).
+   A rising two-note pairing earcon plays.
+3. Phone connects → a rising major-triad earcon plays, window closes immediately (no
+   longer discoverable).
+4. **Both volumes held 3 s** at any time → reopen the window for `PAIR_RETRIGGER`
    (60 s). Pressing again resets the timer.
 5. Window always self-closes on timeout — the device is never stuck discoverable.
 
@@ -134,17 +140,25 @@ adb shell su -c 'vi /data/adb/loop-speaker-mode/config'
 | `DEVICE_NAME` | `"Loop A"` | Bluetooth name advertised in Dumb mode |
 | `KEEP_DATA` | `0` | Set to `1` to leave cellular data ON in Dumb mode |
 | `KEEP_WIFI` | `0` | Set to `1` to leave WiFi ON in Dumb mode |
-| `PAIR_INITIAL` | `180` | Pairing window at boot (seconds) |
+| `PAIR_INITIAL` | `60` | Pairing window at boot (seconds) |
 | `PAIR_RETRIGGER` | `60` | Pairing window on button hold (seconds) |
 | `IDLE_SLEEP_MIN` | `5` | Minutes of silence before auto-suspend |
 | `IDLE_OFF_MIN` | `15` | Minutes of silence before power off |
-| `INPUT_KEYPAD` | `"mtk-kpd"` | Input device name for volume buttons (auto-detected at install) |
-| `INPUT_POWER` | `"mtk-pmic-keys"` | Input device name for power button (auto-detected at install) |
+| `INPUT_KEYPAD` | `""` | Input device name for volume buttons (auto-detected at install if empty) |
+| `INPUT_POWER` | `""` | Input device name for power button (auto-detected at install if empty) |
 | `A2DP_SINK_PROP` | `"bluetooth.profile.a2dp.sink.enabled"` | Prop name for A2DP sink (do not change) |
-| `GESTURE_PAIR_HOLD_MS` | `1500` | Hold both volumes this long to open pairing window (ms) |
-| `GESTURE_MODE_HOLD_MS` | `5000` | Hold Power+Vol− this long to switch Dumb→Full (ms) |
-| `DOUBLE_TAP_WINDOW_MS` | `300` | Double-tap window for track skip — also the delayed-volume decode delay (ms) |
-| `CUE_VOLUME_PCT` | `50` | TTS and audio cue volume as % of max (tune to taste) |
+| `GESTURE_PAIR_HOLD_MS` | `3000` | Hold both volumes this long to open pairing window (ms) |
+| `GESTURE_MODE_HOLD_MS` | `3000` | Hold Power+Vol− this long to switch Dumb→Full (ms) |
+| `POWER_SHUTDOWN_MS` | `2500` | Hold power alone this long to shut down (shorter = play/pause tap) (ms) |
+| `VOL_DOUBLETAP_MS` | `280` | Same volume key tapped twice within this window = track skip (ms); also the delayed-volume decode delay |
+| `VOL_RAMP_DELAY_MS` | `500` | Hold a volume key this long before it starts ramping (ms) |
+| `VOL_RAMP_INTERVAL_MS` | `260` | While held past the ramp delay, nudge volume every this many ms |
+| `GRAB_TOUCH` | `1` | `1` = silence/grab the touchscreen in Dumb mode so it can't wake the screen |
+| `CUE_VOLUME_PCT` | `30` | Volume level (% of max) for the spoken battery-percentage announcement; earcon loudness is fixed in the app (~15%) |
+
+The `INPUT_KEYPAD` and `INPUT_POWER` defaults are shown as `""` — the real values
+(`mtk-kpd` / `mtk-pmic-keys` on the validated unit) are written into the config by
+`customize.sh` at install time.
 
 After editing config, apply without rebooting:
 
@@ -155,14 +169,73 @@ adb shell su -c 'sh /data/adb/loop-speaker-mode/scripts/loop-mode dumb'
 
 ---
 
-## Full-mode launcher (Lawnchair)
+## Audio feedback & alerts
 
-The rainx launcher is permanently disabled (privacy), and the AOSP fallback
-(`com.android.launcher3`) looks broken (empty hotseat, no app feed). Full-Phone mode
-uses **Lawnchair** instead — open-source, Pixel-like, no Google account required. It is
-installed as a normal user app (not part of the module) and set as the default home; the
-preference persists across reboots. In Dumb mode the screen stays off, so the launcher
-only ever shows in Full mode.
+All mode/connection announcements are **synthesized musical earcons** — short tones
+that play at a fixed ~15% loudness (hardcoded in the app, not configurable). They use
+the ALARM audio stream so they cut through Do-Not-Disturb and mix over the music
+without interrupting playback.
+
+**Earcon vocabulary:**
+
+| Event | Earcon |
+|-------|--------|
+| Power tap (play/pause) | Soft single "wake" note — confirms the device is on |
+| Pairing window open / discoverable | Rising two-note tone |
+| Phone connected | Rising major triad |
+| Phone disconnected | Falling two-note tone (re-entering discoverable is silent/implied) |
+| Switch to Dumb-Speaker mode | Low two-note pair |
+| Switch to Full-Phone mode | High two-note pair |
+| Volume max or min reached | Distinct "limit" tone instead of a normal step tick |
+| Volume step tick | Scales with the media volume bar (the only cue that does) |
+| Idle pre-off warning (~1 min before auto-off) | Soft "winding down" tone |
+| Low battery (20%) | Gentle chirp |
+| Low battery (10%) | More insistent chirp |
+| Low battery (~5%) | Power-off tone, then graceful shutdown |
+| Power-off (shutdown) | Power-off earcon, then the device turns off |
+| Battery percentage (on demand) | Spoken percentage (the only spoken cue) |
+
+The **only spoken cue** is the battery percentage, announced on demand.
+`CUE_VOLUME_PCT` (default 30) governs the volume of this announcement only — earcon
+loudness is compiled into the app and is not affected by this setting.
+
+**Do-Not-Disturb:** Dumb-Speaker mode activates DND (alarms-only), keeping phone
+notifications silent. DND is lifted when switching to Full mode. Earcons still play in
+Dumb mode because they use the alarm stream.
+
+**Low-battery warnings:**
+
+- **20%** — a gentle chirp.
+- **10%** — a more insistent chirp.
+- **~5%** — a power-off earcon followed by a graceful shutdown.
+
+Warnings re-arm once you charge back above the threshold. The current low-battery state
+is also re-announced when a phone connects (so you know immediately if the device is low
+after a dead period).
+
+**Idle pre-shutdown warning:** a soft "winding down" tone plays approximately 1 minute
+before the 15-minute idle auto-off fires. Any button press cancels it and resets the idle
+timer.
+
+---
+
+## Full-Phone mode: launcher and quick toggles
+
+The rainx launcher is permanently disabled (privacy). Full-Phone mode uses **Lawnchair**
+— open-source, Pixel-like, no Google account required. It is installed as a normal user
+app (not part of the module) and set as the default home; the preference persists across
+reboots. In Dumb mode the screen stays off, so the launcher only ever shows in Full mode.
+
+**Dock layout** (applied by `tools/apply-lawnchair-layout.sh`):
+Firefox (`org.mozilla.fennec_fdroid`) — Camera — Settings — Play Store.
+All other apps are in the drawer.
+
+**Quick Settings tiles** the project adds:
+- **Mobile Data** — a true one-tap 5G on/off toggle.
+- **Hotspot** — opens the Wi-Fi hotspot screen directly.
+
+The stock Internet and Hotspot QS tiles are also present. The use case is the Loop as
+a connected speaker / mobile hotspot, not a daily phone.
 
 Reproducible setup (host with adb + root):
 
@@ -175,6 +248,9 @@ adb shell su -c 'cmd package set-home-activity app.lawnchair/app.lawnchair.Lawnc
 # verify:
 adb shell 'cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME' | grep packageName
 # expected: packageName=app.lawnchair
+
+# Apply dock layout:
+bash tools/apply-lawnchair-layout.sh
 ```
 
 The APK is **not** committed to the repo. On first Home press in Full mode, Lawnchair

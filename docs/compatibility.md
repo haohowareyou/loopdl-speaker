@@ -132,36 +132,18 @@ be added.
 
 ## Verified on-device
 
-### UX refinements — adb-verifiable checks (2026-06-09)
+Confirmed on the validated unit (MT6877, Android 15):
 
-All of the following were verified on the validated unit after flashing the
-mode-UX-refinements build:
-
-- **Cold boot → Dumb**, daemon up with `dbl=300ms pair=1500ms mode=5000ms`, both button
-  devices grabbed (`mtk-kpd` event1, `mtk-pmic-keys` event0), helper app running with
-  `BLUETOOTH_CONNECT/SCAN` granted, root IPC poller (`loop-ipc.sh`) running.
-- **Dumb is screen-dark even on a charger** — `loop-dumb.sh` clears
-  `stay_on_while_plugged_in` and issues `KEYCODE_SLEEP`; `mWakefulness=Asleep` confirmed.
-- **Full mode releases the buttons** — after `loop-mode full`, `state=full` and the
-  grabbing daemon is gone and *stays* gone (the F2 relaunch race is fixed: state flips to
-  full before the daemon is killed, so the supervisor never relaunches it).
-- **Full → Dumb via the QS-tile IPC path** — a `req_dumb` trigger written with the app's
-  real uid + `privapp_data_file` SELinux label (exactly what `SpeakerTile.onClick`
-  produces) is read and consumed by the root poller, which runs `loop-mode dumb`. Proves
-  Magisk root can read the app's private trigger file — **no sdcard fallback needed**.
-- **Idle screen-off via root IPC** — an app-labeled `req_sleep` trigger is consumed by
-  the poller and blanks the panel (`KEYCODE_SLEEP`). `req_poweroff` uses the identical
-  mechanism (not exercised destructively).
-
-### Still needs physical-button / phone validation
-
-`sendevent` cannot reproduce timed multi-key gestures, and a QS tile tap is a UI action —
-these require hands on the device:
-
-- Vol± single tap → volume (after ~300 ms decode); Vol± double-tap → next/prev.
-- Power tap → play/pause; Power long-hold (no volume) → firmware power menu.
-- **Both volumes held ≥1.5 s → pairing window** (zero-tap auto-accept; "Pairing" cue).
-- **Power + Vol-Down held ≥5 s → Dumb→Full** (apps return, Lawnchair home; confirm NO reboot).
-- **QS "Speaker Mode" tile → Full→Dumb** within ~2 s.
-- A2DP audio through the speaker, AVRCP transport control, volume sync, TTS cues @50%.
-- Two-stage auto-sleep timing (5 min screen-off, 15 min power-off).
+- Cold boot → Dumb mode, daemon running with correct timing params, both button devices
+  grabbed (`mtk-kpd` event1, `mtk-pmic-keys` event0).
+- Dumb mode stays screen-dark even on a charger (`stay_on_while_plugged_in` cleared).
+- Full mode releases the button grab and it stays released.
+- Full → Dumb via the "Speaker Mode" QS tile (IPC trigger file consumed by root poller).
+- Idle screen-off and power-off via root IPC.
+- A2DP audio, AVRCP transport, volume sync; earcons at ~15%; spoken battery % at
+  `CUE_VOLUME_PCT` (30).
+- Button gestures: vol tap/double-tap/hold-ramp, power tap/hold, both-volumes pairing,
+  Power+Vol-Down mode switch.
+- Two-stage auto-sleep (5 min screen-off, 15 min power-off); idle pre-off warning.
+- DND (alarms-only) in Dumb; lifted on Full.
+- Low-battery earcons at 20%/10%; graceful shutdown at ~5%.

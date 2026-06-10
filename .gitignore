@@ -2,6 +2,8 @@
 # Device state dumps (contain settings, eSIM IDs, serials, BT MACs)
 loop-backup/
 snapshot-*/
+snapshots/
+stage1-unrooted-*/
 *getprop*.txt
 *settings-*.txt
 *esim*.txt

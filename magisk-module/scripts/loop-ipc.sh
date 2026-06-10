@@ -43,6 +43,15 @@ while true; do
     fi
   fi
 
+  # Mobile-data toggle from the full-mode QS tile (DataTile). Runs in both modes; svc needs
+  # the full BOOTCLASSPATH + explicit /system/bin/svc (BusyBox standalone shadows it).
+  if [ -f "$APPF/req_data_on" ]; then
+    rm -f "$APPF/req_data_on"; loop_log "ipc: data on"; loop_fix_bcp; /system/bin/svc data enable
+  fi
+  if [ -f "$APPF/req_data_off" ]; then
+    rm -f "$APPF/req_data_off"; loop_log "ipc: data off"; loop_fix_bcp; /system/bin/svc data disable
+  fi
+
   # full -> dumb (QS tile). Only meaningful when not already dumb.
   if [ -f "$APPF/req_dumb" ]; then
     rm -f "$APPF/req_dumb"
