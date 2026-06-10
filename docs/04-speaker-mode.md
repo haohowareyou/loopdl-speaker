@@ -72,6 +72,7 @@ the screen is off.
 | Vol− tap | Volume down |
 | Vol+ double-tap | Next track (AVRCP passthrough to source phone) |
 | Vol− double-tap | Previous track |
+| Vol+ / Vol− hold | Ramp volume (starts after `VOL_RAMP_DELAY_MS`, steps every `VOL_RAMP_INTERVAL_MS`); a "limit" tone plays at max/min |
 | Power tap (release) | Play / pause (AVRCP); also emits a soft "wake" earcon |
 | **Power hold alone ~2.5 s** | **Shutdown** (power-off earcon, then powers off — no firmware power menu in Dumb mode) |
 | Both volumes held 3 s | Open pairing window (60 s) |
