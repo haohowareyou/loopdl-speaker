@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Restore the Loop's package enable/disable layout to a snapshot captured by
-# snapshot-state.sh. Package enable/disable is non-destructive and fully reversible —
+# snapshot-state.sh. Package enable/disable is non-destructive and fully reversible;
 # this just re-syncs which packages are on/off. Settings/props are NOT auto-applied
 # (too device-stateful; the snapshot keeps them for reference only).
 #

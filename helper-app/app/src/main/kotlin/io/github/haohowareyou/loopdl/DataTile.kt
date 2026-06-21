@@ -7,12 +7,12 @@ import android.util.Log
 import java.io.File
 
 /**
- * Quick Settings tile — toggle mobile data (5G). The Loop is used as a connected speaker /
+ * Quick Settings tile: toggle mobile data (5G). The Loop is used as a connected speaker /
  * mobile hotspot, not a phone, so data is normally off; this is the fast "turn the internet
  * on" switch in full mode.
  *
  * The app is unprivileged and can't flip the radio itself, so it drops a trigger file that the
- * root IPC poller (loop-ipc.sh) runs `svc data enable|disable` on — the same pattern the QS
+ * root IPC poller (loop-ipc.sh) runs `svc data enable|disable` on -- the same pattern the QS
  * speaker tile and idle-sleep use. Tile state mirrors Settings.Global mobile_data.
  */
 class DataTile : TileService() {

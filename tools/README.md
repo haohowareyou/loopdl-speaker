@@ -1,1 +1,1 @@
-# (implementation pending — see ../docs/design/)
+# (implementation pending - see ../docs/design/)

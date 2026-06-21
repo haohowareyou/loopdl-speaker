@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# loop-act <action> — maps a daemon gesture action to a concrete effect.
+# loop-act <action>: maps a daemon gesture action to a concrete effect.
 . /data/adb/loop-speaker-mode/scripts/lib.sh
 loop_load_config
 
@@ -9,12 +9,12 @@ case "$1" in
   shutdown)
     # Power held in dumb mode = shut the speaker down. Route through the IPC poller
     # (u:r:magisk:s0): it chimes "Powering off" via the app, waits for the cue, then
-    # runs `svc power shutdown` — calls this daemon exec context is denied.
+    # runs `svc power shutdown`; calls this daemon exec context is denied.
     : > "$LOOP_DIR/req_shutdown" ;;
   mode_toggle)
     # Route the switch through the IPC poller (loop-ipc.sh, u:r:magisk:s0) instead of
     # running loop-mode here. This script is invoked by the native daemon, whose exec
-    # context can run `pm` but is DENIED the `svc`/`settings` binder calls — so radios
+    # context can run `pm` but is DENIED the `svc`/`settings` binder calls; so radios
     # and screen policy silently fail to toggle. The poller's context has that access.
     : > "$LOOP_DIR/req_toggle" ;;
   *)

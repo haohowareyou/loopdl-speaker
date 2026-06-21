@@ -5,11 +5,11 @@
 #
 #   dock (hotseat): Firefox · Camera · Settings · Play Store
 #
-# NOTE — dock only, by design. Lawnchair tracks workspace-PAGE screen order in its own prefs
+# NOTE: dock only, by design. Lawnchair tracks workspace-PAGE screen order in its own prefs
 # store (not this table), so desktop-page rows written via raw SQL get culled by the loader on
 # reload; the hotseat has no such dependency and persists. Setting a full multi-page home
 # reliably needs a `.lawnchairbackup` restore (create one on a configured device, then restore
-# it) — out of scope here. The dock is what's reproducible via SQL.
+# it). Out of scope here. The dock is what's reproducible via SQL.
 #
 # The Loop is rooted, so we edit the launcher DB host-side (no on-device sqlite3): pull it,
 # rewrite favorites with host sqlite3, push it back with the right owner + SELinux context,

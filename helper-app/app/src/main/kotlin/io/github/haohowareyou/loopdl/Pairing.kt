@@ -17,7 +17,7 @@ import android.util.Log
  *  - auto-accept: while enabled (the whole time we're in dumb mode), ANY incoming
  *    pairing request is confirmed automatically and the system dialog is aborted,
  *    so pairing a phone never shows a code or lights the screen. No timed window
- *    or gesture is required — a real BT speaker is always willing to pair.
+ *    or gesture is required -- a real BT speaker is always willing to pair.
  *  - discoverable: the adapter is only made discoverable when nothing is connected
  *    (on entering dumb and on disconnect); once a phone connects we drop back to
  *    connectable-only. The phone needs us discoverable to *find* us, but auto-accept
@@ -93,7 +93,7 @@ class Pairing(val ctx: Context, val tones: Tones) {
 
     /** Become discoverable for `seconds` so a phone can find us. Auto-accept must
      *  already be armed (enableAutoAccept) for the pairing itself to be silent.
-     *  Plays the pairing earcon and restarts the discoverable countdown on EVERY call —
+     *  Plays the pairing earcon and restarts the discoverable countdown on EVERY call --
      *  re-triggering while already open re-cues and resets the timer (there's no screen,
      *  so the earcon is the only "we're open" indicator). */
     fun open(seconds: Int, announce: Boolean = true) {
@@ -121,16 +121,16 @@ class Pairing(val ctx: Context, val tones: Tones) {
     /** Drop a phone WITHOUT un-bonding it.
      *
      *  We used to removeBond() here, which was the root of most of the pairing grief:
-     *  un-bond is one-sided — the speaker forgets the phone but the PHONE keeps its bond,
+     *  un-bond is one-sided -- the speaker forgets the phone but the PHONE keeps its bond,
      *  so (a) the user had to "Forget device" before re-pairing, and (b) the phone kept
      *  auto-reconnecting with a now-invalid key, producing the connect/disconnect FLAPPING
      *  seen in the logs (and the premature/cascading cues).
      *
      *  setConnectionPolicy(FORBIDDEN) is the right primitive: it disconnects the device
      *  AND tells the framework not to auto-reconnect it, while leaving the bond intact on
-     *  both sides — so re-pairing is never required. We also call disconnect() to force
+     *  both sides -- so re-pairing is never required. We also call disconnect() to force
      *  the teardown immediately rather than waiting for the policy to take effect. The
-     *  forbidden device is re-ALLOWED after a delay so it isn't permanently banished —
+     *  forbidden device is re-ALLOWED after a delay so it isn't permanently banished --
      *  long enough for a new phone to grab us, after which the old one is just a normal
      *  bonded device that won't fight for the connection.
      *
@@ -186,7 +186,7 @@ class Pairing(val ctx: Context, val tones: Tones) {
         val a = BluetoothAdapter.getDefaultAdapter() ?: return
         // A13+: the discoverable timeout MUST be set (>0, as a Duration) BEFORE setScanMode,
         // or setScanMode(SCAN_MODE_CONNECTABLE_DISCOVERABLE) is rejected and the adapter
-        // stays SCAN_MODE_NONE — the bug where we announced "Pairing" but were never
+        // stays SCAN_MODE_NONE -- the bug where we announced "Pairing" but were never
         // actually discoverable. The old setDiscoverableTimeout(int) overload is gone on
         // A15 (throws), so we try the Duration signature first.
         if (on) setDiscoverableTimeout(a, seconds.coerceAtLeast(1))
@@ -195,7 +195,7 @@ class Pairing(val ctx: Context, val tones: Tones) {
             val rc = BluetoothAdapter::class.java
                 .getMethod("setScanMode", Int::class.javaPrimitiveType)
                 .invoke(a, mode)
-            // a.scanMode is the public getter — log the ACTUAL resulting mode, not just
+            // a.scanMode is the public getter -- log the ACTUAL resulting mode, not just
             // what we asked for, so a silent rejection is visible.
             Log.i("LoopSpk", "setScanMode($mode) rc=$rc -> scanMode=${a.scanMode}")
         } catch (e: Exception) {

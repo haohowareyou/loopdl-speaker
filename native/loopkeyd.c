@@ -1,5 +1,5 @@
 /*
- * loopkeyd — native button daemon for loop-speaker-mode (Android arm64 / MT6877).
+ * loopkeyd: native button daemon for loop-speaker-mode (Android arm64 / MT6877).
  *
  * Grabs the physical button input devices with EVIOCGRAB, runs a gesture state
  * machine keyed by KEYCODE (not by source device), and re-injects single volume
@@ -10,8 +10,8 @@
  * Device topology on this LoopDL (confirmed via getevent -lp, 2026-06-09):
  *   mtk-pmic-keys  -> KEY_VOLUMEUP (115) AND KEY_POWER (116)
  *   mtk-kpd        -> KEY_VOLUMEDOWN (114) ONLY
- *   mtk-tpd        -> touchscreen (BTN_TOUCH ...) — MUST NOT be grabbed
- *   ...Headset Jack -> headset-remote keys           — MUST NOT be grabbed
+ *   mtk-tpd        -> touchscreen (BTN_TOUCH ...) -- MUST NOT be grabbed
+ *   ...Headset Jack -> headset-remote keys           -- MUST NOT be grabbed
  *
  * The two physical-button devices are grabbed (names from config, defaults
  * "mtk-kpd" and "mtk-pmic-keys"). Because VOLUMEUP and VOLUMEDOWN live on
@@ -35,7 +35,7 @@
  * tap is therefore deferred VOL_DOUBLETAP_MS to see whether a second tap follows, so a
  * lone volume tap carries that much latency (the cost of double-tap disambiguation; big
  * volume changes use hold-to-ramp instead of repeated taps). There is NO firmware power
- * menu in dumb mode — a power hold shuts the speaker down. Combos (pair/mode) are
+ * menu in dumb mode; a power hold shuts the speaker down. Combos (pair/mode) are
  * detected by HOLD timers armed when the keys go down, independent of press order.
  *
  * Key codes: KEY_VOLUMEUP=115, KEY_VOLUMEDOWN=114, KEY_POWER=116.
@@ -208,7 +208,7 @@ static int has_power(int fd, const char *name) {
 /* ---- device discovery ----
  * Collects every physical-button device to grab into devs[]/dev_names[].
  * Strategy:
- *   1. Match the two configured names (INPUT_KEYPAD, INPUT_POWER) — defaults
+ *   1. Match the two configured names (INPUT_KEYPAD, INPUT_POWER), defaults
  *      "mtk-kpd" / "mtk-pmic-keys". Excluded devices are never grabbed.
  *   2. If neither configured name matched anything, fall back to a
  *      capability scan: grab every non-excluded device exposing a button key.
@@ -465,7 +465,7 @@ int main(int argc, char **argv) {
     EP_ADD(t_vrep, TAG_T_VREP);
 #undef EP_ADD
 
-    /* GLOBAL gesture state — keyed by keycode across ALL grabbed devices.
+    /* GLOBAL gesture state, keyed by keycode across ALL grabbed devices.
      * VOLUMEUP and VOLUMEDOWN can arrive on different fds; combos still work. */
     int vup_down = 0, vdn_down = 0, pwr_down = 0;
     int pwr_consumed = 0;       /* power was part of mode combo -> no tap on release */
@@ -596,7 +596,7 @@ int main(int argc, char **argv) {
                         } else {
                             /* first tap (or a tap of the other key while one was pending):
                              * flush any pending single tap of the OTHER key, then defer this
-                             * one. Nothing is injected yet — t_vtap decides tap vs double-tap.
+                             * one. Nothing is injected yet; t_vtap decides tap vs double-tap.
                              * Arm the ramp timer so a HELD key still ramps. */
                             if (vtap_key && vtap_key != ie.code) {
                                 if (!dry_run && ufd >= 0) uinput_tap(ufd, vtap_key);

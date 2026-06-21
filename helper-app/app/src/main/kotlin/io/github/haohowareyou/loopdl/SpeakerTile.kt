@@ -6,7 +6,7 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 
 /**
- * "Speaker Mode" Quick-Settings tile — the full→dumb return path.
+ * "Speaker Mode" Quick-Settings tile -- the full->dumb return path.
  *
  * Tapping it opens a confirmation dialog (ConfirmSpeakerActivity) rather than
  * switching immediately, so a stray tap can't drop the phone into dumb mode. The

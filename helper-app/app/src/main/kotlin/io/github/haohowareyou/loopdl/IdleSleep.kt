@@ -71,7 +71,7 @@ class IdleSleep(
             if (!running) return
             val idleMin = (SystemClock.elapsedRealtime() - last) / 60_000
             if (am.isMusicActive) {
-                // Music is playing — reset idle clock and stay awake
+                // Music is playing -- reset idle clock and stay awake
                 poke()
             } else {
                 when {

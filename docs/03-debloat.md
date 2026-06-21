@@ -10,7 +10,7 @@ documents the package strategy and how to manage the permanent rainx removals.
 
 Packages are split into two lists, both under `magisk-module/scripts/`:
 
-### Permanent removes (3 packages) — `packages-permanent-disable.txt`
+### Permanent removes (3 packages): `packages-permanent-disable.txt`
 
 These are permanently removed (uninstalled for user 0) in **both** Dumb-Speaker and
 Full-Phone mode. They are never re-enabled by the module. This is the privacy
@@ -31,15 +31,15 @@ tools/loop-debloat.sh remove   # uninstall all 3 for user 0
 tools/loop-debloat.sh restore  # reinstall from system APK (reversible)
 ```
 
-`remove` uses `pm uninstall --user 0` — the system APK stays on the read-only
+`remove` uses `pm uninstall --user 0`; the system APK stays on the read-only
 partition, so `restore` can bring them back. The packages are **currently removed**
 on this unit.
 
-### Toggled packages (29 packages) — `packages-toggled.txt`
+### Toggled packages (29 packages): `packages-toggled.txt`
 
 These are `pm disable-user` in Dumb-Speaker mode and `pm enable` in Full-Phone mode.
-They cover standard Android apps that are useful on a phone but unnecessary — and
-battery/privacy expensive — on a speaker:
+They cover standard Android apps that are useful on a phone but unnecessary (and
+battery/privacy expensive) on a speaker:
 
 ```
 com.android.chrome
@@ -86,7 +86,7 @@ Play Store, GMS/gsf, eUICC (eSIM), `com.android.phone` (mobile data stack),
 
 By default, Android does not expose the Bluetooth A2DP sink profile (receive audio
 from a phone). Enabling it requires two `resetprop` calls and a Bluetooth stack
-restart — and the restart has a gotcha:
+restart, and the restart has a gotcha:
 
 ```bash
 # As root:

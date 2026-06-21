@@ -1,7 +1,7 @@
 # Step 1: Unlock the bootloader via MediaTek BROM
 
 The LoopDL's OEM bootloader lock **cannot** be removed through the normal Android
-Developer Options toggle — it is absent on this device. The only path is the
+Developer Options toggle; it is absent on this device. The only path is the
 MediaTek Boot ROM (BROM), which on early units requires no authentication at all.
 
 ---
@@ -13,7 +13,7 @@ Before doing anything destructive, confirm the BROM is open on your unit:
 ```bash
 cd ~/path/to/mtkclient
 ./venv/bin/python mtk.py printgpt
-# Connect device: powered OFF, then plug USB — NO buttons held (see below)
+# Connect device: powered OFF, then plug USB - NO buttons held (see below)
 ```
 
 Expected output includes:
@@ -25,7 +25,7 @@ SBC: False
 DAA (root-cert): False
 ```
 
-If `SLA`, `SBC`, or the root cert show `True`, **stop** — your unit has BROM
+If `SLA`, `SBC`, or the root cert show `True`, **stop**. Your unit has BROM
 authentication enabled and the unlock process described here will not work. See
 [`docs/compatibility.md`](compatibility.md) for more details.
 
@@ -39,7 +39,7 @@ authentication enabled and the unlock process described here will not work. See
 
 | Mode | How to enter | Result |
 |------|-------------|--------|
-| **PRELOADER** (correct) | Power OFF the device completely, then plug USB with **NO buttons held** | mtkclient loads the DA and stage 2 completes — all commands work |
+| **PRELOADER** (correct) | Power OFF the device completely, then plug USB with **NO buttons held** | mtkclient loads the DA and stage 2 completes; all commands work |
 | BROM (wrong for this) | Hold Vol-Down + Vol-Up while plugging USB | mtkclient hangs on stage-2 DRAM config; never proceeds |
 
 The preloader runs just long enough to supply DRAM/EMI config to the DA; BROM mode
@@ -91,7 +91,7 @@ See [`docs/recovery.md`](recovery.md) for the full backup recipe. At minimum, ba
 When prompted (or when the script waits for the device):
 
 - Power the device **completely off**
-- Plug USB — **NO buttons held** (PRELOADER mode)
+- Plug USB - **NO buttons held** (PRELOADER mode)
 
 Expected output ends with something like:
 
@@ -117,7 +117,7 @@ first boot does not stall on an unexpected wipe prompt.
 ### 4. Boot and configure
 
 Power on normally. The device boots through the standard Android setup. There is **no
-orange-screen unlock warning** on this OEM — its absence is normal for rainx hardware,
+orange-screen unlock warning** on this OEM; its absence is normal for rainx hardware,
 not an indication that anything went wrong.
 
 After setup, enable Developer Options (tap Build Number 7× in Settings → About phone)
@@ -134,6 +134,6 @@ adb shell getprop ro.boot.verifiedbootstate      # → orange
 
 ## What this unlocks
 
-Once `seccfg` is unlocked, `fastboot` works fully — you can flash partitions (e.g.
+Once `seccfg` is unlocked, `fastboot` works fully. You can flash partitions (e.g.
 `init_boot` for rooting) and the BROM remains reachable for recovery. The device is
 now in a state where the root steps in [docs/02-root.md](02-root.md) work.

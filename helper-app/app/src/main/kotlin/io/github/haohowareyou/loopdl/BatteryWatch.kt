@@ -23,7 +23,7 @@ import java.io.File
  * you hear "this thing is nearly empty" right when you start a session.
  *
  * Level comes from the sticky ACTION_BATTERY_CHANGED broadcast (no polling). Shutdown reuses
- * the same root IPC trigger file as IdleSleep — the unprivileged app can't power off itself.
+ * the same root IPC trigger file as IdleSleep -- the unprivileged app can't power off itself.
  */
 class BatteryWatch(val ctx: Context, val tones: Tones) {
     companion object {

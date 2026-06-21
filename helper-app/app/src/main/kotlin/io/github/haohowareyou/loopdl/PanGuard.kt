@@ -9,9 +9,9 @@ import android.os.Looper
 import android.util.Log
 
 /**
- * Speaker mode wants ONLY A2DP audio from the phone — never its data. When a phone is bonded,
+ * Speaker mode wants ONLY A2DP audio from the phone -- never its data. When a phone is bonded,
  * Android opportunistically brings up **Bluetooth PAN** (the phone acting as a network-access
- * point — "hotspot over Bluetooth"), because each device's per-profile PAN connection policy
+ * point ("hotspot over Bluetooth"), because each device's per-profile PAN connection policy
  * defaults to UNKNOWN(-1), which the stack treats as "may auto-connect". That silently routes
  * the speaker onto the phone's data.
  *
@@ -54,7 +54,7 @@ class PanGuard(val ctx: Context) {
         if (attempt < 6) h.postDelayed({ if (proxy == null) bind(attempt + 1) }, 2000)
     }
 
-    /** Forbid PAN for every bonded device — call on dumb entry. */
+    /** Forbid PAN for every bonded device -- call on dumb entry. */
     fun forbidAll() {
         val a = BluetoothAdapter.getDefaultAdapter() ?: return
         val pr = proxy ?: return
@@ -63,7 +63,7 @@ class PanGuard(val ctx: Context) {
         for (d in bonded) forbid(pr, d)
     }
 
-    /** Forbid PAN for one device — call when a phone connects. */
+    /** Forbid PAN for one device -- call when a phone connects. */
     fun forbid(d: BluetoothDevice) {
         val pr = proxy ?: return
         forbid(pr, d)

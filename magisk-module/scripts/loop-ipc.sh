@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# loop-ipc.sh — root-side executor for requests the unprivileged helper app
+# loop-ipc.sh: root-side executor for requests the unprivileged helper app
 # (io.github.haohowareyou.loopdl) drops in its own filesDir. The app has no su and cannot run
 # pm/svc/input or write /data/adb, so it signals us via trigger files; we poll and
 # execute as root.
@@ -19,7 +19,7 @@ while true; do
   state=$(cat "$STATE" 2>/dev/null)
 
   # power-hold shutdown from the native daemon (dumb mode). Chime first so the user
-  # — who has no screen — knows it heard them, then power off. The cue volume and the
+  # (who has no screen) knows it heard them, then power off. The cue volume and the
   # shutdown are both run from this (su) context where svc/am succeed.
   if [ -f "$LOOP_DIR/req_shutdown" ]; then
     rm -f "$LOOP_DIR/req_shutdown"

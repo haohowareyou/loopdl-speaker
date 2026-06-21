@@ -3,17 +3,17 @@
 # timestamped snapshot dir, so any later change can be rolled back with restore-state.sh.
 #
 # This is the LOGICAL half of a stage snapshot (the irreplaceable partition half is a
-# separate mtkclient dump — see capture-unrooted-baseline.sh / run-partition-backup.sh).
+# separate mtkclient dump; see capture-unrooted-baseline.sh / run-partition-backup.sh).
 # The three stages we keep:
-#   1. unrooted     — pristine factory state (capture from a NEW unrooted unit; see docs/05)
-#   2. rooted       — unlocked + Magisk + A2DP-sink, before debloat (loop-backup/snapshot-*-rooted-baseline)
-#   3. speaker-mode — the speaker module installed + configured
+#   1. unrooted     - pristine factory state (capture from a NEW unrooted unit; see docs/05)
+#   2. rooted       - unlocked + Magisk + A2DP-sink, before debloat (loop-backup/snapshot-*-rooted-baseline)
+#   3. speaker-mode - the speaker module installed + configured
 #
 # Usage:  tools/snapshot-state.sh <label> [out_base]
 #   label    : stage name, e.g. speaker-mode
 #   out_base : where to write (default ./snapshots). Snapshot dir = <out_base>/snapshot-<date>-<label>
 #
-# Output dirs match the repo .gitignore (snapshots/, snapshot-*/) — they contain device
+# Output dirs match the repo .gitignore (snapshots/, snapshot-*/); they contain device
 # identifiers (serial in getprop, etc.) and must never be committed.
 set -euo pipefail
 
@@ -34,7 +34,7 @@ adb shell 'pm list packages -e' | sed 's/package://' | tr -d '\r' | sort > "$DIR
 adb shell 'pm list packages -d' | sed 's/package://' | tr -d '\r' | sort > "$DIR/packages-disabled.txt"
 adb shell 'pm list packages -3' | sed 's/package://' | tr -d '\r' | sort > "$DIR/packages-3rdparty.txt"
 
-# --- settings + props (reference; not auto-restored — too device-stateful) ---
+# --- settings + props (reference; not auto-restored; too device-stateful) ---
 for ns in global secure system; do
   adb shell "settings list $ns" | tr -d '\r' | sort > "$DIR/settings-$ns.txt"
 done
@@ -57,9 +57,9 @@ adb shell 'getprop' | tr -d '\r' > "$DIR/getprop.txt"
 } > "$DIR/speaker-state.txt"
 
 cat > "$DIR/README.md" <<EOF
-# Loop logical-state snapshot — stage: $LABEL ($DATE)
+# Loop logical-state snapshot - stage: $LABEL ($DATE)
 
-Captured by tools/snapshot-state.sh. The LOGICAL software state only — package
+Captured by tools/snapshot-state.sh. The LOGICAL software state only - package
 enable/disable layout, settings, props, Magisk/module state. The irreplaceable
 per-unit partitions (identity/RF/lock) are a separate mtkclient dump.
 
@@ -69,11 +69,11 @@ tools/restore-state.sh "$DIR"
 \`\`\`
 
 ## Files
-- packages-{all,enabled,disabled,3rdparty}.txt — exact package layout
-- settings-{global,secure,system}.txt — Settings provider (reference)
-- getprop.txt — full props (reference; CONTAINS DEVICE SERIAL — gitignored)
-- magisk-state.txt — Magisk version + modules + boot scripts
-- speaker-state.txt — A2DP/AVRCP role + loop module presence (stage-3 markers)
+- packages-{all,enabled,disabled,3rdparty}.txt - exact package layout
+- settings-{global,secure,system}.txt - Settings provider (reference)
+- getprop.txt - full props (reference; CONTAINS DEVICE SERIAL - gitignored)
+- magisk-state.txt - Magisk version + modules + boot scripts
+- speaker-state.txt - A2DP/AVRCP role + loop module presence (stage-3 markers)
 
 See docs/05-snapshots.md for the full 3-stage model.
 EOF

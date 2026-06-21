@@ -56,9 +56,9 @@ class Cues(val ctx: Context, val volPct: Int) {
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volPct / 100f)
         }
         // The speaker amp suspends when idle; the first word of a cue lands on a cold amp
-        // and gets clipped to nothing (only cues right after music — amp warm — were
+        // and gets clipped to nothing (only cues right after music -- amp warm -- were
         // audible). Open the output with ~1.5s of silence first so the amp fully powers
-        // up before we speak (700ms wasn't enough — the cue still clipped). For pairing
+        // up before we speak (700ms wasn't enough -- the cue still clipped). For pairing
         // cues the bounded AudioKeepAlive (LoopService) already keeps the amp warm; this
         // primer covers the one-off cases (boot "Speaker mode", battery, mode toggle).
         // Both QUEUE_ADD so order is preserved.

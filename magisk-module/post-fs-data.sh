@@ -3,8 +3,8 @@
 loop_load_config
 resetprop "${A2DP_SINK_PROP:-bluetooth.profile.a2dp.sink.enabled}" true
 resetprop bluetooth.profile.a2dp.source.enabled false
-# AVRCP role: a sink speaker is the Controller (CT) — it SENDS play/pause/next/prev to
-# the phone — and must NOT run the Target (TG) role, which is the phone's role. A sink
+# AVRCP role: a sink speaker is the Controller (CT) -- it SENDS play/pause/next/prev to
+# the phone, and must NOT run the Target (TG) role, which is the phone's role. A sink
 # stuck on TG cannot send transport commands AND fails absolute-volume negotiation
 # (phone + speaker each apply their own gain = two independent sliders). Switching to
 # CT with absvol enabled gives transport control + one synced volume slider.

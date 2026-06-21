@@ -9,7 +9,7 @@ import android.util.Log
  * Bounded amp keep-alive.
  *
  * The speaker amp suspends a second or two after audio stops; a TTS cue that lands on a
- * cold amp gets clipped to silence. We can't keep the amp warm 24/7 — a continuously
+ * cold amp gets clipped to silence. We can't keep the amp warm 24/7 -- a continuously
  * active audio stream blocks deep doze and drains the battery. So this is only run for
  * the brief windows where a cue is likely on a cold amp: while a pairing window is open
  * (the disconnect/"Pairing"/"Connected" cues fire then). It auto-stops the instant a

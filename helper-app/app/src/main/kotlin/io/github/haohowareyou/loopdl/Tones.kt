@@ -14,21 +14,21 @@ import kotlin.math.sin
 
 /**
  * Tiny earcon synthesizer. The speaker has no screen, so a handful of short musical tones
- * ARE the entire feedback channel — they replace the old spoken cues ("Pairing"/"Connected"
+ * ARE the entire feedback channel -- they replace the old spoken cues ("Pairing"/"Connected"
  * /"Disconnected"/...). The vocabulary is deliberately small and consonant so it's learnable
  * and never harsh:
  *
- *   wake()         single warm note       — a button press told you "I'm on"
- *   pairing()      slow rising two-note    — discoverable, waiting for a phone
- *   connected()    rising major triad      — a phone linked (resolved / "good")
- *   disconnected() falling two-note         — the phone dropped
- *   speaker()/full() low two-note pair      — mode switch
+ *   wake()         single warm note       - a button press told you "I'm on"
+ *   pairing()      slow rising two-note    - discoverable, waiting for a phone
+ *   connected()    rising major triad      - a phone linked (resolved / "good")
+ *   disconnected() falling two-note         - the phone dropped
+ *   speaker()/full() low two-note pair      - mode switch
  *
  * Each note is a sine fundamental plus a quiet octave, shaped by a short raised-cosine attack
  * and an exponential decay, so it reads as a mellow bell/marimba pip rather than a flat beep.
  *
  * Played as USAGE_ALARM so it passes DND's alarms-only filter and mixes OVER the A2DP-sink
- * stream / through doze — the same routing the old TTS cues relied on. [gain] caps how loud
+ * stream / through doze -- the same routing the old TTS cues relied on. [gain] caps how loud
  * the synthesized tone itself can be, independent of the system volume slider; it's the one
  * knob to make the whole set gentler or stronger.
  *
@@ -39,14 +39,14 @@ import kotlin.math.sin
  */
 class Tones(private val warmAmp: () -> Unit) {
     private val sr = 44100
-    // Master loudness of the rendered PCM, i.e. peak amplitude as a fraction of full scale —
+    // Master loudness of the rendered PCM, i.e. peak amplitude as a fraction of full scale --
     // effectively "what % of full volume" every earcon plays at (the volume-step tick is the
     // only cue that instead scales with the media bar). ~0.15 = a soft, unobtrusive level:
     // present but never a blast. This is THE knob to make the whole set louder/quieter.
     private val gain = 0.15
 
     // Frequencies (Hz). Major-pentatonic so any combination stays consonant. Kept in the
-    // warm 330–660 mid: low enough to read as a mellow "chime" rather than a sharp pip, but
+    // warm 330-660 mid: low enough to read as a mellow "chime" rather than a sharp pip, but
     // not so low the phone's tiny speaker (weak below ~330Hz) can't reproduce it.
     private object F {
         const val E4 = 329.63; const val G4 = 392.0; const val A4 = 440.0; const val C5 = 523.25
@@ -156,7 +156,7 @@ class Tones(private val warmAmp: () -> Unit) {
                 val t = i.toDouble() / sr
                 val env = (if (i < atk) 0.5 * (1 - cos(PI * i / atk)) else 1.0) *
                           exp(-2.4 * i / len)              // gentle bell-like decay (rings a touch)
-                // Mostly fundamental with only a faint octave for body — keeps it warm, not
+                // Mostly fundamental with only a faint octave for body -- keeps it warm, not
                 // bright/sharp (the louder octave was what gave the old tone its edge).
                 val s = sin(2 * PI * n.f * t) + 0.10 * sin(2 * PI * 2 * n.f * t)
                 out[idx++] = (s / 1.10 * env * gain * Short.MAX_VALUE).toInt().toShort()

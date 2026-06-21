@@ -5,8 +5,8 @@ until [ "$(getprop sys.boot_completed)" = 1 ]; do sleep 2; done
 sleep 3
 
 # Boot straight into the speaker, not the phone. The moment the framework is up, blank
-# the panel and kill Wi-Fi so the device never lingers as a full phone — auto-joining a
-# known hotspot, lighting the launcher — during this late_start window. The heavier
+# the panel and kill Wi-Fi so the device never lingers as a full phone, auto-joining a
+# known hotspot, lighting the launcher, during this late_start window. The heavier
 # dumb-mode apply and the BT role bounce below then happen behind an already-dark screen.
 input keyevent 223          # KEYCODE_SLEEP
 loop_set_radio wifi off
@@ -23,7 +23,7 @@ done
 
 # Force AVRCP Controller (CT) role for the sink speaker. The bluetooth.profile.* props
 # are re-asserted by the BT stack at its OWN init stage (after post-fs-data), so setting
-# them early doesn't stick — they must be set here (late_start) and the stack bounced.
+# them early doesn't stick; they must be set here (late_start) and the stack bounced.
 # CT lets the speaker SEND play/pause/next/prev to the phone and enables absolute-volume
 # (one synced slider); the ROM-default Target role breaks both.
 #
@@ -43,7 +43,7 @@ fi
 
 # The enable above sometimes lands the adapter in BLE_ON (BLE stack up, CLASSIC BT off):
 # enabled:false, ScanMode SCAN_MODE_NONE. In that half-state A2DP and discoverability are
-# dead — setScanMode returns ERROR_BLUETOOTH_NOT_ENABLED and the speaker announces "Pairing"
+# dead: setScanMode returns ERROR_BLUETOOTH_NOT_ENABLED and the speaker announces "Pairing"
 # but is never findable. Force it to full classic ON, re-issuing enable until the state
 # settles (or we give up after ~24s and let it be).
 settings put global bluetooth_on 1

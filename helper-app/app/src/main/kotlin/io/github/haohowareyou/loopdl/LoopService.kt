@@ -21,15 +21,15 @@ import android.util.Log
  * Started on BOOT_COMPLETED (via BootReceiver) and on every CMD broadcast (via CmdReceiver).
  *
  * dispatch() is the single entry point for all commands. Commands:
- *   mode_dumb      — entered speaker mode (boot path: reconnect/pair + idle-sleep on)
- *   mode_full      — entered full mode (idle-sleep off)
- *   pair_open      — open PAIR_RETRIGGER-second discoverable window
- *   play_pause     — AVRCP toggle play/pause
- *   next           — AVRCP next track
- *   prev           — AVRCP previous track
- *   battery        — announce battery %
- *   say <text>     — speak arbitrary text via TTS
- *   ping           — no-op health check (just logs)
+ *   mode_dumb      - entered speaker mode (boot path: reconnect/pair + idle-sleep on)
+ *   mode_full      - entered full mode (idle-sleep off)
+ *   pair_open      - open PAIR_RETRIGGER-second discoverable window
+ *   play_pause     - AVRCP toggle play/pause
+ *   next           - AVRCP next track
+ *   prev           - AVRCP previous track
+ *   battery        - announce battery %
+ *   say <text>     - speak arbitrary text via TTS
+ *   ping           - no-op health check (just logs)
  */
 class LoopService : Service() {
     companion object {
@@ -56,7 +56,7 @@ class LoopService : Service() {
     private var dumbMode = false
     private val handler = Handler(Looper.getMainLooper())
     // Set briefly when WE deliberately drop a phone (manual handoff): the resulting
-    // disconnect must NOT announce "Disconnected"/re-open — pair_open already did.
+    // disconnect must NOT announce "Disconnected"/re-open -- pair_open already did.
     private var suppressDisconnect = false
     // Address of the phone we last announced "Connected" for. Gates double-announce
     // (flapping / re-fire for the same link) and is cleared only on a true disconnect.
@@ -67,10 +67,10 @@ class LoopService : Service() {
     private var sinkProxy: BluetoothProfile? = null
 
     // Two connect/disconnect signals, deduped:
-    //  1) PRIMARY — the A2DP-Sink profile CONNECTION_STATE_CHANGED broadcast. Authoritative
+    //  1) PRIMARY: the A2DP-Sink profile CONNECTION_STATE_CHANGED broadcast. Authoritative
     //     and fires only on a real profile transition (after pairing+audio is up), so it
     //     never produces the premature "Connected" the raw ACL did.
-    //  2) FALLBACK — ACL_CONNECTED triggers a polled confirm against the sink profile state
+    //  2) FALLBACK: ACL_CONNECTED triggers a polled confirm against the sink profile state
     //     (in case the broadcast isn't delivered on this ROM). Both routes funnel into
     //     onConnected()/onDisconnected(), which are idempotent (announcedAddr / collapsed
     //     disconnect runnable), so firing twice is harmless.
@@ -91,7 +91,7 @@ class LoopService : Service() {
                     Log.i(TAG, "ACL connected")
                     idleSleep.poke()
                     if (dumbMode && dev != null) {
-                        // Forbid PAN the instant the phone links (reliable — uses the event's
+                        // Forbid PAN the instant the phone links (reliable -- uses the event's
                         // device, not the flaky bondedDevices cache), so it can never bring up
                         // Bluetooth tethering. Policy doesn't persist, so this re-asserts each
                         // connect.
@@ -130,7 +130,7 @@ class LoopService : Service() {
     private val disconnectRunnable = Runnable {
         if (dumbMode && !suppressDisconnect && !pairing.anyConnected()) {
             announcedAddr = null
-            // Just the "dropped" earcon — re-entering pairing right after is implied, so we
+            // Just the "dropped" earcon -- re-entering pairing right after is implied, so we
             // reopen the discoverable window silently (announce=false) rather than chaining a
             // second tone the user doesn't need.
             tones.disconnected()
@@ -145,7 +145,7 @@ class LoopService : Service() {
     /** ACL fallback: poll the real A2DP-Sink profile state a few times (it comes up a beat
      *  after the ACL) and announce via onConnected() once CONNECTED. Only forces an
      *  announce on the last attempt if the proxy is unavailable (-1) AND no STATE_DISCONNECTED
-     *  was seen — degraded path for a ROM that delivers neither the broadcast nor the proxy. */
+     *  was seen -- degraded path for a ROM that delivers neither the broadcast nor the proxy. */
     private fun confirmConnected(dev: BluetoothDevice, attempt: Int) {
         handler.postDelayed({
             if (!dumbMode || announcedAddr == dev.address) return@postDelayed
@@ -193,7 +193,7 @@ class LoopService : Service() {
     }
 
     /** Any button interaction keeps the amp warm for 45s so feedback tones/cues are
-     *  audible — without a 24/7 stream that would block doze and drain the battery. */
+     *  audible -- without a 24/7 stream that would block doze and drain the battery. */
     private fun touchAmp() = warmAmpFor(45_000L)
 
     /** Open a discoverable pairing window with the amp kept warm for its duration, so the
@@ -231,11 +231,11 @@ class LoopService : Service() {
         idleSleep = IdleSleep(this, Config.IDLE_SLEEP_MIN, Config.IDLE_OFF_MIN) { tones.idleWarn() }
         volume   = Volume(this, avrcp)
         // Volume press feedback also warms the amp so the tick (and any nearby cue) is
-        // audible from a cold/standby amp — same "is it on?" reassurance as the power chime.
+        // audible from a cold/standby amp -- same "is it on?" reassurance as the power chime.
         // onEdge: distinct "limit" earcon when volume tops out / bottoms out.
         tick     = Tick(this, { touchAmp() }, { tones.edge() })
         battery  = BatteryWatch(this, tones)
-        panGuard = PanGuard(this)   // block BT-PAN (phone's data over Bluetooth) — audio only
+        panGuard = PanGuard(this)   // block BT-PAN (phone's data over Bluetooth) -- audio only
 
         avrcp.init()
         cues.init()
@@ -265,7 +265,7 @@ class LoopService : Service() {
     fun dispatch(cmd: String, arg: String?) {
         Log.i(TAG, "cmd=$cmd arg=$arg")
         when (cmd) {
-            "ping"       -> { /* health check — already logged above */ }
+            "ping"       -> { /* health check -- already logged above */ }
 
             "mode_dumb"  -> {
                 dumbMode = true
@@ -298,7 +298,7 @@ class LoopService : Service() {
             "pair_open"  -> {
                 // Forced handoff: forget+drop whoever's connected, then open for a new
                 // phone. We ALWAYS open ourselves (the drop's ACL_DISCONNECTED can't be
-                // relied on — removeBond may land after a beat, and plain disconnect
+                // relied on -- removeBond may land after a beat, and plain disconnect
                 // didn't fire it at all). Suppress that disconnect's cue so we say
                 // "Pairing" once, not "Pairing"+"Disconnected".
                 pairing.enableAutoAccept()
@@ -309,8 +309,8 @@ class LoopService : Service() {
                 openPairing(Config.PAIR_RETRIGGER)
             }
 
-            // Power tap: toggle play/pause AND emit the soft wake earcon so — with no
-            // screen — a press tells you the speaker is on even when nothing's playing.
+            // Power tap: toggle play/pause AND emit the soft wake earcon so -- with no
+            // screen -- a press tells you the speaker is on even when nothing's playing.
             "play_pause" -> { avrcp.playPause(); tones.wake() }
             "next"       -> { avrcp.next(); touchAmp() }
             "prev"       -> { avrcp.prev(); touchAmp() }

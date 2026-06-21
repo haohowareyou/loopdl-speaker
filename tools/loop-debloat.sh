@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Permanently remove the rainx/loop bloatware — REVERSIBLY.
+# Permanently remove the rainx/loop bloatware -- REVERSIBLY.
 #
 # The speaker module only DISABLES the rainx packages (they never run, in either mode). This
 # goes a step further and uninstalls them for the only user (user 0). That removes them

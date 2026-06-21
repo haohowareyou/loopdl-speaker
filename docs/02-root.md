@@ -1,8 +1,8 @@
 # Step 2: Root with Magisk
 
 After unlocking (see [docs/01-unlock.md](01-unlock.md)), root is straightforward via
-Magisk and `fastboot flash init_boot`. This device uses `init_boot` — **not** `boot`
-— as the ramdisk partition (standard on Android 13+ A/B devices with GKI kernels).
+Magisk and `fastboot flash init_boot`. This device uses `init_boot`, **not** `boot`,
+as the ramdisk partition (standard on Android 13+ A/B devices with GKI kernels).
 
 ---
 

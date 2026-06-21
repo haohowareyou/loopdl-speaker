@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# loopkeyd.sh — respawn supervisor for the native button daemon.
+# loopkeyd.sh: respawn supervisor for the native button daemon.
 # Only runs the grabbing daemon while state==dumb; in full mode the binary
 # is signalled (pkill -TERM) by loop-full.sh and the loop here idles until
 # the state flips back to dumb (then it relaunches within ~2s).

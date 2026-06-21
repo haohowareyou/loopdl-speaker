@@ -68,7 +68,7 @@ unlocked state). You can re-root at any time by repeating [step 2](02-root.md).
 Use this when you need to recover a specific partition (e.g. `seccfg`, `vbmeta`,
 `init_boot`) from the raw backup in `loop-backup/partitions-2026-06-09/`.
 
-**Device must be in PRELOADER mode** (power off, plug USB — **NO buttons held**; see
+**Device must be in PRELOADER mode** (power off, plug USB - **NO buttons held**; see
 [docs/01-unlock.md](01-unlock.md) for the explanation of why this matters).
 
 ```bash
@@ -125,7 +125,7 @@ Device will boot with `verifiedbootstate=green` and OEM lock re-applied.
 
 If the device will not boot at all and mtkclient can connect, the BROM is your
 fallback. As long as the MediaTek BROM is unauthenticated (confirmed via
-`mtk printgpt` — see [docs/compatibility.md](compatibility.md)), every partition on
+`mtk printgpt`; see [docs/compatibility.md](compatibility.md)), every partition on
 the device can be rewritten over USB.
 
 Connect in PRELOADER mode (see layer 4) and use `mtk.py w` to restore any partition

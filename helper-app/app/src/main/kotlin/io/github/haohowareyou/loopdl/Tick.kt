@@ -33,7 +33,7 @@ class Tick(val ctx: Context, val onVolume: () -> Unit = {}, val onEdge: () -> Un
             if (v < 0 || v == prev) return
             onVolume()   // warm the amp so this tick (cold-amp/standby) is audible
             // At the rails, play the distinct "limit" earcon instead of a normal step pip so
-            // you know — with no screen — that you've topped out / bottomed out.
+            // you know -- with no screen -- that you've topped out / bottomed out.
             val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             if (v >= max || v <= 0) { onEdge(); return }
             play(v)

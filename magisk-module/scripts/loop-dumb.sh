@@ -16,7 +16,7 @@ settings put secure location_mode 0
 
 # bt name + screen policy. The advertised Bluetooth name is secure/bluetooth_name
 # (global/device_name alone does NOT rename the adapter); set both. Applied by the BT
-# stack on its next init (i.e. from the next boot) — harmless to re-set every dumb entry.
+# stack on its next init (i.e. from the next boot); harmless to re-set every dumb entry.
 settings put global device_name "$DEVICE_NAME"
 settings put secure bluetooth_name "$DEVICE_NAME"
 
@@ -24,7 +24,7 @@ settings put secure bluetooth_name "$DEVICE_NAME"
 # IdleSleep can't because it runs unprivileged). Keep a short timeout as a backstop
 # in case something briefly wakes it (charger insert, etc.). The daemon grabs the
 # power key, so a power tap maps to play/pause and does NOT wake the panel.
-# Also clear "stay awake while plugged in" — a speaker is usually on a charger, and
+# Also clear "stay awake while plugged in": a speaker is usually on a charger, and
 # that developer setting (if on) would otherwise keep the panel lit indefinitely.
 settings put global stay_on_while_plugged_in 0
 # Disable double-tap-to-wake: it keeps the touch digitizer in a low-power gesture-scan
@@ -46,7 +46,7 @@ settings put secure doze_enabled 0           # ambient display pulses
 settings put system sound_effects_enabled 0  # volume feedback is app-played (Tick); no system click
 # Silence notifications/ringtones in speaker mode (no screen to read them, and they
 # barge over music). INTERRUPTION_FILTER_ALARMS mutes notifications + ringer but still
-# lets ALARM-usage audio through — and the app's TTS cues are USAGE_ALARM, so spoken
+# lets ALARM-usage audio through; and the app's TTS cues are USAGE_ALARM, so spoken
 # cues ("Connected", "Pairing") still sound. zen state persists across reboot; restored
 # to "off" in full mode. Run from this (root) context where cmd notification succeeds.
 cmd notification set_dnd alarms 2>/dev/null

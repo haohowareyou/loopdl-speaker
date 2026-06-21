@@ -15,7 +15,7 @@ import android.view.KeyEvent
  * when the loop is an AVRCP Controller (CT) with a connected source, the BT stack
  * publishes the remote player as the active MediaSession, so a dispatched media key
  * is forwarded to the phone over AVRCP. (BluetoothAvrcpController.sendPassThroughCmd
- * was removed from AOSP by Android 15 — reflection on it throws NoSuchMethod.)
+ * was removed from AOSP by Android 15 -- reflection on it throws NoSuchMethod.)
  *
  * We still bind BluetoothAvrcpController (profile 12) for setAbsoluteVolume (used by
  * the optional Volume bridge) and connection-state visibility.
@@ -47,7 +47,7 @@ class Avrcp(val ctx: Context) {
     /**
      * Dispatches a media key (down + up) to the active MediaSession, which the BT stack
      * routes to the connected AVRCP player (the phone). Works regardless of whether a
-     * controller proxy/connected-device is visible to us — routing is handled by the
+     * controller proxy/connected-device is visible to us -- routing is handled by the
      * framework's media session service.
      */
     private fun mediaKey(code: Int) {
@@ -65,7 +65,7 @@ class Avrcp(val ctx: Context) {
     fun prev()      = mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
 
     /**
-     * Forward absolute volume (0–127) to the source device via the hidden
+     * Forward absolute volume (0-127) to the source device via the hidden
      * BluetoothAvrcpController.setAbsoluteVolume method.
      * No-op if ctrl is null (proxy not bound yet) or method not found on this ROM.
      */
