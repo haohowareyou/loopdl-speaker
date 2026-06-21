@@ -32,9 +32,10 @@ Look for these lines in the output:
 ```
 SLA: False
 SBC: False
+DAA: False
 ```
 
-If either shows `True`, your BROM has authentication enabled. The unlock procedure
+If **any** of these shows `True`, your BROM has authentication enabled. The unlock procedure
 documented here will not succeed on your unit. Do not proceed with `da seccfg unlock`.
 
 ## Normal-bootloader unlock
@@ -102,13 +103,17 @@ A security review (2026-06-09) of the app, daemon, and scripts found no critical
 issues. Calibrated to the threat model (personal rooted device; nearby attacker + a
 rogue sideloaded app are the only real surfaces):
 
-- **Auto-accept pairing is safe by design**: it only accepts while a pairing window is
-  open (time-bounded), the window always self-closes (timeout / connect / mode-switch /
-  service destroy), and `ACTION_PAIRING_REQUEST` is a protected broadcast a normal app
-  cannot spoof. The device is **not** discoverable or auto-accepting outside a window.
-  The receiver registers at `SYSTEM_HIGH_PRIORITY` and calls `abortBroadcast()` to
-  suppress the system pairing dialog (zero-tap); this only fires inside an open window,
-  so it does not weaken the time-bounded guarantee.
+- **Auto-accept pairing is armed for the whole Dumb session**: while the device is in Dumb
+  mode it silently confirms any incoming pairing request, because a real speaker is always
+  willing to pair. This is **not** time-bounded to the pairing window; the discoverable
+  window only controls whether a new phone can *find* the device, not whether pairing is
+  accepted. A phone that already knows the device's Bluetooth address can therefore pair or
+  reconnect at any time in Dumb mode. The threat model accepts this: pairing needs physical
+  radio proximity and the device holds no user data in Dumb mode. `ACTION_PAIRING_REQUEST`
+  is a protected broadcast a normal app cannot spoof; the receiver registers at
+  `SYSTEM_HIGH_PRIORITY` and calls `abortBroadcast()` to suppress the system pairing dialog
+  (zero-tap). If you want acceptance restricted to the open window, gate the receiver on an
+  in-window flag set by `open()`/`close()` in `Pairing.kt`.
 - **Control broadcasts are permission-gated**: `io.github.haohowareyou.loopdl.CMD` is protected by a
   `signature`-level permission, so a sideloaded app cannot open a pairing window or
   toggle modes. The module's own callers run as root (uid 0, exempt) so internal

@@ -20,6 +20,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+For the avoidance of doubt, "the Software" above includes the documentation,
+guides, scripts, and instructions in this repository.
+
 Note: This project modifies device firmware/bootloader state. It ships NO
-copyrighted OEM firmware. Each user must dump their own device images. Using
-it carries risk of data loss or bricking; see docs/recovery.md. No warranty.
+copyrighted OEM firmware. Each user must dump their own device images. No
+warranty.
+
+Assumption of risk: following these instructions can permanently brick your
+device, void its warranty, and cause irreversible data loss. You alone are
+responsible for verifying each step against your own hardware. You accept all
+risk; the authors accept no liability. See docs/recovery.md.
+
+This is an independent, unofficial project, not affiliated with, endorsed by,
+or sponsored by the maker or seller of the LoopDL. Product names are used only
+to identify the device; the marks belong to their respective owners.

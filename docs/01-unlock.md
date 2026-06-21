@@ -4,6 +4,14 @@ The LoopDL's OEM bootloader lock **cannot** be removed through the normal Androi
 Developer Options toggle; it is absent on this device. The only path is the
 MediaTek Boot ROM (BROM), which on early units requires no authentication at all.
 
+**New to this?** The BROM is a tiny program baked into the chip that runs before Android,
+before even the bootloader. On these early units it will talk to a PC over USB and let you
+read or write any partition, which is how we unlock and how you recover from a brick. The
+*preloader* is the next stage after the BROM; you connect in preloader mode (described
+below) because it hands the flashing tool the memory settings the BROM does not. `mtkclient`
+is the open-source PC tool that drives all of this. You do not flash anything proprietary;
+you only operate on your own device.
+
 ---
 
 ## Verify your BROM is unauthenticated first
@@ -79,10 +87,38 @@ Run all mtkclient commands as:
 
 ### 1. Back up critical partitions (do this before unlocking)
 
-See [`docs/recovery.md`](recovery.md) for the full backup recipe. At minimum, back up
-`init_boot_a`, `seccfg`, and `vbmeta_a` before proceeding.
+Dump your unit's partitions over the BROM before you change anything. Connect in PRELOADER
+mode (power off, plug USB, no buttons) for each command. mtkclient reads a partition with
+`mtk.py r <partition> <outfile>`.
+
+At minimum, back up the partitions you might need to restore:
+
+```bash
+mkdir -p ../loop-backup/partitions-mine
+cd ~/path/to/mtkclient
+for P in init_boot_a seccfg vbmeta_a; do
+  ./venv/bin/python mtk.py r $P ../loop-backup/partitions-mine/$P.img
+done
+```
+
+For full brick-insurance also dump your **per-unit identity partitions**. These are unique
+to your device (serial, RF calibration, eSIM state) and cannot be recovered from anyone
+else's unit:
+
+```bash
+for P in nvram protect1 protect2 persist nvdata nvcfg frp; do
+  ./venv/bin/python mtk.py r $P ../loop-backup/partitions-mine/$P.img
+done
+```
+
+Keep this folder safe and off the device. [`docs/recovery.md`](recovery.md) uses these
+images to write partitions back if anything goes wrong.
 
 ### 2. Unlock seccfg
+
+> **Destructive step. Read before running.** This wipes `userdata` and `metadata` on the
+> next boot. Your eSIM survives (it lives on the eUICC chip, not in userdata); everything
+> else in userdata is gone. Make sure you finished the backup in step 1 first.
 
 ```bash
 ./venv/bin/python mtk.py da seccfg unlock
@@ -100,10 +136,6 @@ Jumping to 0x200000: ok
 [DA] XFlashExt SBC patched
 Unlocking seccfg... done
 ```
-
-**This is destructive:** the bootloader will wipe `userdata` and `metadata` on the
-next boot. eSIM credentials stored in the eUICC survive (they live on the eUICC chip,
-not in userdata). Everything else in userdata is gone.
 
 ### 3. Erase userdata and metadata
 

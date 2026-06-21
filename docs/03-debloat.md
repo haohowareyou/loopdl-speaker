@@ -4,6 +4,13 @@ After rooting, disable or remove packages that are unwanted for a speaker use-ca
 The speaker module manages the toggle list automatically once installed; this page
 documents the package strategy and how to manage the permanent rainx removals.
 
+**Manual vs automatic:** once the speaker module ([step 4](04-speaker-mode.md)) is
+installed it applies the 29 toggled packages and enables the A2DP sink on every boot for
+you. The only one-time manual action on this page is hard-removing the 3 rainx packages
+(`loop-debloat.sh remove`), and that is idempotent and can be done before or after the
+module. The A2DP commands further down are shown so you understand what the module does;
+you do not have to run them by hand for normal use.
+
 ---
 
 ## Package strategy
@@ -13,9 +20,9 @@ Packages are split into two lists, both under `magisk-module/scripts/`:
 ### Permanent removes (3 packages): `packages-permanent-disable.txt`
 
 These are permanently removed (uninstalled for user 0) in **both** Dumb-Speaker and
-Full-Phone mode. They are never re-enabled by the module. This is the privacy
-guarantee: rainx OEM code cannot run, so no always-on mic, location, or tracking is
-possible.
+Full-Phone mode. They are never re-enabled by the module. This is the privacy rationale:
+with the vendor's preinstalled packages removed, none of that code runs, which reduces the
+device's privacy attack surface.
 
 ```
 co.rainx.loop.launcher
@@ -84,6 +91,10 @@ Play Store, GMS/gsf, eUICC (eSIM), `com.android.phone` (mobile data stack),
 
 ## A2DP sink enablement
 
+> The speaker module does all of this automatically on every boot (see Persistence below).
+> The commands here are for understanding and one-off manual testing; you do not need to
+> run them by hand for normal use.
+
 By default, Android does not expose the Bluetooth A2DP sink profile (receive audio
 from a phone). Enabling it requires two `resetprop` calls and a Bluetooth stack
 restart, and the restart has a gotcha:
@@ -126,7 +137,8 @@ and is installed by the Magisk module in [step 4](04-speaker-mode.md).
 ## Rolling back over-debloat
 
 If you accidentally disable something essential, use the snapshot's
-`restore-package-state.sh` (in `loop-backup/snapshot-2026-06-09-rooted-baseline/`):
+`restore-package-state.sh` (in your rooted-baseline snapshot directory under
+`../loop-backup/`):
 
 ```bash
 ./restore-package-state.sh

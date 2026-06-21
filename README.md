@@ -8,6 +8,10 @@ one-gesture switch back to a complete Android phone.
 This repo ships **no OEM firmware**. You dump your own. Modifying the bootloader or
 firmware risks data loss; see [`docs/recovery.md`](docs/recovery.md).
 
+This is an independent, unofficial project. It is not affiliated with, endorsed by, or
+sponsored by the maker or seller of the LoopDL. "LoopDL" and other product names are used
+only to identify the device this works on; the marks belong to their respective owners.
+
 ## About this project
 
 I am not a developer and I am not certified in any of this. I built it by vibe coding
@@ -21,13 +25,36 @@ through the steps for your own device. Read everything before you run it, keep y
 backups, and do it all at your own risk. If something breaks or bricks, that is on you,
 not me.
 
+## Risks and prerequisites
+
+Read this before you start. Some of what follows cannot be undone:
+
+- **Unlocking wipes the device.** The bootloader unlock erases all user data. Your eSIM
+  survives (it lives on the eUICC chip), everything else in userdata is gone.
+- **It voids your warranty.** Treat the device as out of support the moment you unlock.
+- **It can soft-brick a protected unit.** The unlock only works if your BROM is
+  unauthenticated, meaning `SLA`, `SBC`, and `DAA` all read `False`. Run `mtk printgpt`
+  and check first; if any reads `True`, stop. The procedure here will not work on your
+  unit and pushing ahead risks leaving it unbootable.
+
+What the host computer needs (the machine you run this from):
+
+- **Python 3.12** for mtkclient (`brew install python@3.12`, or from python.org).
+- **Android Platform Tools** for `adb` and `fastboot`, on your PATH.
+- To build the helper app yourself: **JDK 17**, the **Android SDK** build-tools, and the
+  **NDK** (see `tools/setup-ndk.sh`).
+
+The docs assume macOS. Linux needs minor path changes; Windows is untested. There is no
+pre-built download. You build the module and app from source.
+
 ## What you get
 
 - **Dumb-Speaker mode** (default on every boot): Bluetooth A2DP sink, hardware media
   controls, one synced volume slider, radios off, screen dark. Auto-pairing, idle
   auto-sleep, audio earcon feedback, battery safety shutdowns.
 - **Full-Phone mode** (one gesture): a normal Android phone again, all apps restored
-  except the 3 rainx packages (permanently removed for privacy). Lawnchair launcher with
+  except the 3 rainx packages (permanently removed to cut the privacy attack surface).
+  Lawnchair launcher with
   Firefox/Camera/Settings/Play Store dock, and quick-toggle QS tiles for Mobile Data and
   Hotspot.
 - **Audio earcons**: synthesized musical tones on the alarm stream (the screenless

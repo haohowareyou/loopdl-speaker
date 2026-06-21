@@ -35,7 +35,7 @@ build/
 *.zip
 !*-template.zip
 # compiled native daemon (build artifact; rebuild with native/Makefile)
-magisk-module/system/bin/loopkeyd
+magisk-module/system/bin/loopkeyd*
 
 # ── OS noise ──
 .DS_Store

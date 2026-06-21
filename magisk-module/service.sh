@@ -4,6 +4,10 @@ MODDIR=${0%/*}
 until [ "$(getprop sys.boot_completed)" = 1 ]; do sleep 2; done
 sleep 3
 
+# Clear any stale IPC trigger files so a req_shutdown (or other trigger) left by a
+# hard reset or crash cannot re-fire on the next boot before any mode decision runs.
+rm -f "$LOOP_DIR"/req_*
+
 # Boot straight into the speaker, not the phone. The moment the framework is up, blank
 # the panel and kill Wi-Fi so the device never lingers as a full phone, auto-joining a
 # known hotspot, lighting the launcher, during this late_start window. The heavier

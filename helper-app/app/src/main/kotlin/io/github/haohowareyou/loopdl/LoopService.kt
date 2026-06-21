@@ -113,6 +113,7 @@ class LoopService : Service() {
     private fun onConnected(dev: BluetoothDevice) {
         if (!dumbMode || announcedAddr == dev.address) return
         announcedAddr = dev.address
+        reconnect.cancelTimeout()         // phone arrived in time; cancel the pairing fallback
         idleSleep.poke()
         handler.removeCallbacks(ampStopRunnable)
         keepAlive.stop()                  // music/route keeps the amp warm now
@@ -250,7 +251,7 @@ class LoopService : Service() {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         }
-        registerReceiver(a2dpReceiver, filter, RECEIVER_EXPORTED)
+        registerReceiver(a2dpReceiver, filter, "android.permission.BLUETOOTH_PRIVILEGED", null, RECEIVER_EXPORTED)
         ready = true
     }
 

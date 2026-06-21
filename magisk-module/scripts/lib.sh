@@ -6,7 +6,12 @@ LOG="$LOOP_DIR/loop.log"
 
 loop_log() { echo "$(date '+%H:%M:%S') $*" >> "$LOG"; log -t LoopSpk "$*"; }
 
-loop_load_config() { [ -f "$CONFIG" ] && . "$CONFIG"; }
+loop_load_config() {
+  # Config is sourced as shell for personal-device convenience; it is intentionally
+  # not a security boundary (device is already rooted, single-user).
+  [ -f "$CONFIG" ] && . "$CONFIG"
+  [ -f "$CONFIG" ] && chmod 0600 "$CONFIG"
+}
 
 # fire a cue/command into the helper app
 loop_app() { am broadcast -a io.github.haohowareyou.loopdl.CMD --es cmd "$1" ${2:+--es arg "$2"} \

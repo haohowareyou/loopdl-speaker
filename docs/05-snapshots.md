@@ -32,8 +32,10 @@ Captured snapshots live outside the repo (gitignored) because they contain devic
 ## Capturing stage 1 (unrooted): do this on a NEW unit
 
 This unit is already rooted, so a pristine unrooted image can't be taken from it. Capture the
-generic stock firmware from a **new, factory LoopDL** (cross-unit identical, so it's a valid
-baseline for any unit):
+generic stock firmware from a **new, factory LoopDL**. The generic partitions are identical
+across units **only when both run the same firmware version**, so a dump is a valid baseline
+only for units on that version. Record `ro.build.fingerprint` of the source unit and of any
+unit you later restore onto, and confirm they match before relying on a cross-unit dump:
 
 ```bash
 # New unit: power OFF, plug USB in PRELOADER mode (no buttons).

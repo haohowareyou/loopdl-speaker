@@ -33,8 +33,9 @@ If you've accidentally disabled something essential and the device is still func
 enough to run adb:
 
 ```bash
-# From the repo root:
-cd loop-backup/snapshot-2026-06-09-rooted-baseline
+# cd into the rooted-baseline snapshot you captured in step 5
+# (under ../loop-backup/, named snapshot-<date>-rooted-baseline):
+cd ../loop-backup/snapshot-<date>-rooted-baseline
 ./restore-package-state.sh
 ```
 

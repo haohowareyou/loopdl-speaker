@@ -12,7 +12,10 @@ cp -af "$MODPATH/scripts" "$LOOP_DIR/scripts"
 # auto-detect keypad + power input devices if not set
 kp=$(grep -lE 'mtk-kpd' /sys/class/input/event*/device/name 2>/dev/null | head -1)
 pw=$(grep -lE 'mtk-pmic-keys|mtk_pmic_keys' /sys/class/input/event*/device/name 2>/dev/null | head -1)
-# fallback: scan getevent names → handled by daemon at runtime if blank
+# persist detected paths into the installed config (only when detection found something)
+[ -n "$kp" ] && sed -i "s|INPUT_KEYPAD=\"\"|INPUT_KEYPAD=\"$kp\"|" "$LOOP_DIR/config"
+[ -n "$pw" ] && sed -i "s|INPUT_POWER=\"\"|INPUT_POWER=\"$pw\"|" "$LOOP_DIR/config"
+# fallback: scan getevent names -> handled by daemon at runtime if blank
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm "$MODPATH/system/bin/loopkeyd" 0 0 0755 2>/dev/null
 ui_print "- Loop Speaker Mode installed. Reboot to apply (boots to Dumb)."

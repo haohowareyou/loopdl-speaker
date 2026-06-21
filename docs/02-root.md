@@ -9,8 +9,10 @@ as the ramdisk partition (standard on Android 13+ A/B devices with GKI kernels).
 ## What you need
 
 - Magisk APK (v30.x tested; download from [github.com/topjohnwu/Magisk](https://github.com/topjohnwu/Magisk/releases))
-- The stock `init_boot_a.img` for your firmware version  
-  (dump it yourself: `adb shell su -c 'dd if=/dev/block/by-name/init_boot_a' > init_boot_a.img`, or use the partitions backup from recovery step 0)
+- The stock `init_boot_a.img` for your firmware version. You already dumped this in
+  [step 1](01-unlock.md) (`../loop-backup/partitions-mine/init_boot_a.img`); use that copy.
+  (A `dd` dump over `su` also works, but only once you are already rooted, so it is not an
+  option at this point.)
 - `adb` and `fastboot` on your Mac/PC
 
 ---
@@ -30,9 +32,11 @@ adb install Magisk-v30.6.apk
 - Pick your `init_boot_a.img`
 - Magisk produces `magisk_patched-XXXXX.img` in `/sdcard/Download/`
 
-Pull it back to your Mac:
+Pull it back to your Mac. The patched filename has a random suffix, so list it first and
+pull the exact name (`adb pull` does not expand shell globs):
 
 ```bash
+adb shell ls /sdcard/Download/magisk_patched*.img
 adb pull /sdcard/Download/magisk_patched-30600_XXXXX.img magisk_patched.img
 ```
 
@@ -44,7 +48,9 @@ Boot the device into fastboot mode:
 adb reboot bootloader
 ```
 
-Flash to the current slot (the device is A/B; check active slot first if unsure):
+This device is A/B: it keeps two copies of each boot partition (slot A and slot B) and
+boots from whichever is active. `fastboot getvar current-slot` tells you which one; flash
+`init_boot` and it targets the active slot:
 
 ```bash
 fastboot getvar current-slot          # → current-slot: a

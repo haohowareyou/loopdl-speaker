@@ -6,8 +6,12 @@
 # NEW, untouched LoopDL (the user has one) to capture a clean stock firmware set you can
 # reflash to return ANY unit to unrooted.
 #
-# It dumps the GENERIC firmware partitions only -- these are identical across MT6877 LoopDL
-# units, so a clean copy from any factory unit is a valid stock baseline. It deliberately
+# It dumps the GENERIC firmware partitions only -- these are assumed identical across MT6877
+# LoopDL units on the SAME FIRMWARE VERSION. A dump from a different firmware version is NOT
+# a safe cross-unit restore baseline. Record ro.build.fingerprint of BOTH the source unit
+# (this dump) and the target unit before relying on a cross-unit restore.
+# WARNING: always verify firmware versions match before using a cross-unit dump (see echo below).
+# These are, so a clean copy from any factory unit is a valid stock baseline. It deliberately
 # does NOT dump the per-unit identity partitions (nvram/protect/persist/nvdata/seccfg): those
 # are unique per device and must come from each unit itself (this unit's are already saved in
 # loop-backup/partitions-2026-06-09/). It also skips userdata/super-bulk (huge, not needed to
@@ -31,6 +35,9 @@ scp_a scp_b sspm_a sspm_b spmfw_a spmfw_b mcupmfw_a mcupmfw_b gpt"
 
 echo ">> dumping stock firmware partitions to $OUT"
 echo ">> (preloader mode: device OFF, replug, NO buttons; mtkclient will retry the handshake)"
+echo ">> WARNING: this dump is a valid cross-unit restore baseline ONLY for units on the same"
+echo ">>   firmware version. Record ro.build.fingerprint of BOTH source and target units"
+echo ">>   before using this dump to restore a different unit."
 cd "$MTK_DIR"
 for p in $PARTS; do
   echo "   -- $p"

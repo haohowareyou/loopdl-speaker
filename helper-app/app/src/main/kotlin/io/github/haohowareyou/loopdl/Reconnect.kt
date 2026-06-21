@@ -4,6 +4,8 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 
 /**
@@ -20,6 +22,15 @@ import android.util.Log
 class Reconnect(val ctx: Context) {
     private val A2DP_SINK = 11
     private var sinkProxyRef: BluetoothProfile? = null
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var timeoutRunnable: Runnable? = null
+
+    /** Cancel the pending connect-timeout (call from LoopService.onConnected). */
+    fun cancelTimeout() {
+        timeoutRunnable?.let { handler.removeCallbacks(it) }
+        timeoutRunnable = null
+    }
 
     fun tryLast(onFail: () -> Unit) {
         val a = BluetoothAdapter.getDefaultAdapter()
@@ -40,6 +51,15 @@ class Reconnect(val ctx: Context) {
                         .getMethod("connect", BluetoothDevice::class.java)
                         .invoke(proxy, d)
                     Log.i("LoopSpk", "reconnect -> ...${d.address.takeLast(5)}")
+                    // Schedule a fallback: if the phone is out of range, connect() returns
+                    // without exception but no ACL event arrives. Open the pairing window
+                    // after 10s so the user is not left waiting silently.
+                    val r = Runnable {
+                        Log.i("LoopSpk", "reconnect timeout: no ACL in 10s, opening pairing")
+                        onFail()
+                    }
+                    timeoutRunnable = r
+                    handler.postDelayed(r, 10_000L)
                 } catch (e: Exception) {
                     Log.e("LoopSpk", "reconnect connect", e)
                     onFail()

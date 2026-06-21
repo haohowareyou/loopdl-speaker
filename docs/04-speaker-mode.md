@@ -12,11 +12,14 @@ The `loop-speaker-mode` Magisk module is the core of this project. It provides:
 
 ## Install
 
-1. Build the flashable zip (or use a pre-built release):
+1. Build the helper app first, then the flashable zip. The module bundles the app as a
+   priv-app, so the app must exist before the zip is built or the module ships without it:
    ```bash
-   bash tools/build-module.sh
-   # Produces: build/loop-speaker-mode.zip
+   bash tools/build-app.sh      # builds the helper APK (needs JDK 17 + Android SDK + NDK)
+   bash tools/build-module.sh   # bundles it into build/loop-speaker-mode.zip
    ```
+   `build-module.sh` refuses to run if the helper APK is not present yet, so you cannot
+   accidentally flash a module with no app in it.
 
 2. Push to the device and flash via Magisk:
    ```bash
@@ -103,6 +106,11 @@ Mechanism: the tile is part of the helper app, which is unprivileged. It drops a
 `req_dumb` trigger file in its `filesDir`; the root IPC poller (`loop-ipc.sh`) sees it
 and runs `loop-mode dumb`. A full power-off/on also always boots back to Dumb (safety net).
 
+If the **"Speaker Mode"** tile is not available to add, the helper app did not install as a
+priv-app (usually the module was built without the APK; see Install step 1). Until you
+rebuild and reflash, a full power-off then power-on always boots straight back to Dumb, so
+you are never stuck in Full.
+
 ---
 
 ## Pairing flow
@@ -119,8 +127,11 @@ and runs `loop-mode dumb`. A full power-off/on also always boots back to Dumb (s
 Pairing uses Bluetooth Just-Works (no PIN) and is **zero-tap**: the helper app's
 `ACTION_PAIRING_REQUEST` receiver registers at `SYSTEM_HIGH_PRIORITY`, auto-accepts via
 `setPairingConfirmation(true)`, and calls `abortBroadcast()` to suppress the system
-pairing dialog, so nothing needs to be tapped on the (dark) screen. It only does this
-while a pairing window is open.
+pairing dialog, so nothing needs to be tapped on the (dark) screen. Auto-accept stays armed
+the whole time the device is in Dumb mode (a real speaker is always willing to pair); the
+pairing window only controls whether the device is *discoverable*, not whether it accepts.
+A phone that already knows the device's address can therefore reconnect or re-pair at any
+time in Dumb mode.
 
 ---
 
@@ -130,10 +141,17 @@ The config file is at `/data/adb/loop-speaker-mode/config`. It is created from
 `config.default` on first install and never overwritten by module updates; your edits
 persist.
 
-Edit it as root:
+Edit it as root. If you are comfortable with `vi`:
 
 ```bash
 adb shell su -c 'vi /data/adb/loop-speaker-mode/config'
+# vi cheat: press i to type, Esc when done, then :wq and Enter to save and quit.
+```
+
+Or change a single value without an editor (this example renames the speaker):
+
+```bash
+adb shell su -c 'sed -i "s/^DEVICE_NAME=.*/DEVICE_NAME=\"Patio\"/" /data/adb/loop-speaker-mode/config'
 ```
 
 | Key | Default | Description |

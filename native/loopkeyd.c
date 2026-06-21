@@ -86,10 +86,10 @@
 /* config-tunable thresholds (ms) */
 static long vdtap_ms        = 280;     /* max gap between two taps of a vol key = skip */
 static long pair_hold_ms    = 3000;
-static long mode_hold_ms    = 5000;
+static long mode_hold_ms    = 3000;    /* must stay in sync with GESTURE_MODE_HOLD_MS in config.default */
 static long power_off_ms    = 2500;    /* power held alone this long = shutdown */
 static long vol_ramp_delay_ms = 500;   /* hold a volume key this long before ramping */
-static long vol_ramp_int_ms   = 120;   /* then nudge again every this many ms */
+static long vol_ramp_int_ms   = 260;   /* then nudge again every this many ms; must stay in sync with VOL_RAMP_INTERVAL_MS in config.default */
 static int  grab_touch        = 1;     /* GRAB_TOUCH: silence touchscreen in dumb mode */
 
 static char cfg_keypad[128] = "";  /* INPUT_KEYPAD from config (device name) */
