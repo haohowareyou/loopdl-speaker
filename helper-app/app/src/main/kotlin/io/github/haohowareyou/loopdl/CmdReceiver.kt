@@ -1,11 +1,11 @@
-package co.loop.speaker
+package io.github.haohowareyou.loopdl
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
 /**
- * Receives `am broadcast -a co.loop.speaker.CMD --es cmd <cmd> [--es arg <arg>]`
+ * Receives `am broadcast -a io.github.haohowareyou.loopdl.CMD --es cmd <cmd> [--es arg <arg>]`
  * and forwards it to LoopService as a startForegroundService call.
  */
 class CmdReceiver : BroadcastReceiver() {

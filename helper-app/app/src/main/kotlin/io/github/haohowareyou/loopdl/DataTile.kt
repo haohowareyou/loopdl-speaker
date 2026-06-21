@@ -1,4 +1,4 @@
-package co.loop.speaker
+package io.github.haohowareyou.loopdl
 
 import android.provider.Settings
 import android.service.quicksettings.Tile

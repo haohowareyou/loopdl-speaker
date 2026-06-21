@@ -16,9 +16,9 @@ loop_set_radio wifi off
 # NOT auto-grant dangerous perms and the app is headless (no UI to prompt). Grants persist
 # across reboots, so this is effectively a one-time first-boot step (idempotent thereafter).
 i=0
-until pm path co.loop.speaker >/dev/null 2>&1 || [ "$i" -ge 30 ]; do sleep 1; i=$((i+1)); done
+until pm path io.github.haohowareyou.loopdl >/dev/null 2>&1 || [ "$i" -ge 30 ]; do sleep 1; i=$((i+1)); done
 for p in BLUETOOTH_CONNECT BLUETOOTH_SCAN BLUETOOTH_ADVERTISE; do
-  pm grant co.loop.speaker "android.permission.$p" 2>/dev/null
+  pm grant io.github.haohowareyou.loopdl "android.permission.$p" 2>/dev/null
 done
 
 # Force AVRCP Controller (CT) role for the sink speaker. The bluetooth.profile.* props
@@ -31,7 +31,7 @@ done
 # spoken cues (it owns no a2dpReceiver while dead). loop-mode dumb then starts it fresh
 # AFTER the stack is settled, so it binds the now-available AvrcpControllerService and
 # announces exactly one clean "Connected" instead of the old pair-twice chatter.
-am force-stop co.loop.speaker
+am force-stop io.github.haohowareyou.loopdl
 resetprop bluetooth.profile.avrcp.controller.enabled true
 resetprop bluetooth.profile.avrcp.target.enabled false
 resetprop persist.bluetooth.disableabsvol false

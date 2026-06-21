@@ -109,7 +109,7 @@ rogue sideloaded app are the only real surfaces):
   The receiver registers at `SYSTEM_HIGH_PRIORITY` and calls `abortBroadcast()` to
   suppress the system pairing dialog (zero-tap) — this only fires inside an open window,
   so it does not weaken the time-bounded guarantee.
-- **Control broadcasts are permission-gated** — `co.loop.speaker.CMD` is protected by a
+- **Control broadcasts are permission-gated** — `io.github.haohowareyou.loopdl.CMD` is protected by a
   `signature`-level permission, so a sideloaded app cannot open a pairing window or
   toggle modes. The module's own callers run as root (uid 0, exempt) so internal
   signaling still works.

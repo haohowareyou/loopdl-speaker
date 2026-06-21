@@ -3,10 +3,10 @@ plugins {
     kotlin("android")
 }
 android {
-    namespace = "co.loop.speaker"
+    namespace = "io.github.haohowareyou.loopdl"
     compileSdk = 35
     defaultConfig {
-        applicationId = "co.loop.speaker"
+        applicationId = "io.github.haohowareyou.loopdl"
         minSdk = 35
         targetSdk = 35
         versionCode = 1

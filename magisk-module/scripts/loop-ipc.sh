@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # loop-ipc.sh — root-side executor for requests the unprivileged helper app
-# (co.loop.speaker) drops in its own filesDir. The app has no su and cannot run
+# (io.github.haohowareyou.loopdl) drops in its own filesDir. The app has no su and cannot run
 # pm/svc/input or write /data/adb, so it signals us via trigger files; we poll and
 # execute as root.
 #
@@ -13,7 +13,7 @@
 # app-private but Magisk root can read/delete it.
 . /data/adb/loop-speaker-mode/scripts/lib.sh
 
-APPF=/data/data/co.loop.speaker/files
+APPF=/data/data/io.github.haohowareyou.loopdl/files
 
 while true; do
   state=$(cat "$STATE" 2>/dev/null)

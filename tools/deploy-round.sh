@@ -21,8 +21,8 @@ sed -i 's/^GESTURE_PAIR_HOLD_MS=.*/GESTURE_PAIR_HOLD_MS=3000     # both volumes 
 grep -E '^GESTURE_PAIR_HOLD_MS' "$RT/config"
 
 echo "== APK -> module priv-app =="
-DST="$MOD/system/priv-app/LoopSpeaker/LoopSpeaker.apk"
-cp -f "$TMP/LoopSpeaker.apk" "$DST"
+DST="$MOD/system/priv-app/LoopDLSpeaker/LoopDLSpeaker.apk"
+cp -f "$TMP/LoopDLSpeaker.apk" "$DST"
 chmod 644 "$DST"
 chown 0:0 "$DST"
 chcon u:object_r:system_file:s0 "$DST"

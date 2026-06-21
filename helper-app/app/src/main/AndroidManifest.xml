@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="co.loop.speaker">
-  <permission android:name="co.loop.speaker.CONTROL" android:protectionLevel="signature"/>
+    package="io.github.haohowareyou.loopdl">
+  <permission android:name="io.github.haohowareyou.loopdl.CONTROL" android:protectionLevel="signature"/>
   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
   <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
   <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
@@ -10,13 +10,13 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-  <application android:label="Loop Speaker" android:persistent="true">
+  <application android:label="LoopDL Speaker" android:persistent="true">
     <service android:name=".LoopService" android:exported="true"
              android:foregroundServiceType="connectedDevice"
-             android:permission="co.loop.speaker.CONTROL"/>
+             android:permission="io.github.haohowareyou.loopdl.CONTROL"/>
     <receiver android:name=".CmdReceiver" android:exported="true"
-              android:permission="co.loop.speaker.CONTROL">
-      <intent-filter><action android:name="co.loop.speaker.CMD"/></intent-filter>
+              android:permission="io.github.haohowareyou.loopdl.CONTROL">
+      <intent-filter><action android:name="io.github.haohowareyou.loopdl.CMD"/></intent-filter>
     </receiver>
     <receiver android:name=".BootReceiver" android:exported="true">
       <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter>

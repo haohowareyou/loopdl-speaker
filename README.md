@@ -1,7 +1,9 @@
 # loopdl-speaker
 
-Turn a **rainx LoopDL** (MT6877 "5G speaker" — a stock Android 15 phone underneath)
-into a lean **Bluetooth speaker**, with a one-gesture switch back to a full Android phone.
+Root the **rainx LoopDL** — the *"Portable 5G WiFi & Bluetooth Speaker"* sold at
+[loopdl.co.uk](https://www.loopdl.co.uk) (MediaTek **MT6877 / Dimensity 900**, Android 15,
+a full Android phone underneath) — and turn it into a lean **Bluetooth speaker**, with a
+one-gesture switch back to a complete Android phone.
 
 This repo ships **no OEM firmware** — you dump your own. Modifying bootloader/firmware
 risks data loss; see [`docs/recovery.md`](docs/recovery.md).
@@ -48,7 +50,7 @@ Android shell + priv-app + native daemon; only the unlock is unit-sensitive.
 | Script | What it does |
 |--------|-------------|
 | `tools/build-module.sh` | Build `build/loop-speaker-mode.zip` — the flashable Magisk module |
-| `tools/build-app.sh` | Build the helper APK (`co.loop.speaker`) |
+| `tools/build-app.sh` | Build the helper APK (`io.github.haohowareyou.loopdl`) |
 | `tools/snapshot-state.sh` | Capture a logical-state snapshot (packages/settings/props) |
 | `tools/restore-state.sh` | Restore package enable/disable layout from a snapshot |
 | `tools/capture-unrooted-baseline.sh` | Dump pristine firmware from a new factory unit (stage 1) |

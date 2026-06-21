@@ -1,4 +1,4 @@
-package co.loop.speaker
+package io.github.haohowareyou.loopdl
 
 import android.util.Log
 import java.io.File

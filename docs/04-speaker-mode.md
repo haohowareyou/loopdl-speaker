@@ -4,7 +4,7 @@ The `loop-speaker-mode` Magisk module is the core of this project. It provides:
 
 - Boot-time enforcement of Dumb-Speaker mode
 - Hardware button gesture handling via `loopkeyd`
-- The helper app (`co.loop.speaker`) for Bluetooth pairing, AVRCP transport, volume,
+- The helper app (`io.github.haohowareyou.loopdl`) for Bluetooth pairing, AVRCP transport, volume,
   audio earcons, auto-reconnect, and auto-sleep
 - A single config file you can edit to tune the device
 

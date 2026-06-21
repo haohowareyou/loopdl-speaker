@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and sign co.loop.speaker, install APK into magisk-module tree.
+# Build and sign io.github.haohowareyou.loopdl, install APK into magisk-module tree.
 # Usage: bash tools/build-app.sh
 # Requires: ANDROID_HOME (or ANDROID_SDK_ROOT), JAVA_HOME (JDK 17)
 set -euo pipefail
@@ -12,7 +12,7 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$ROOT/helper-app"
-OUT_DIR="$ROOT/magisk-module/system/priv-app/LoopSpeaker"
+OUT_DIR="$ROOT/magisk-module/system/priv-app/LoopDLSpeaker"
 
 cd "$APP_DIR"
 
@@ -58,9 +58,9 @@ mkdir -p "$OUT_DIR"
   --ks-pass pass:android \
   --key-pass pass:android \
   --v4-signing-enabled false \
-  --out "$OUT_DIR/LoopSpeaker.apk" \
+  --out "$OUT_DIR/LoopDLSpeaker.apk" \
   "$APK"
-rm -f "$OUT_DIR/LoopSpeaker.apk.idsig"
+rm -f "$OUT_DIR/LoopDLSpeaker.apk.idsig"
 
-echo "[build-app] done → $OUT_DIR/LoopSpeaker.apk"
-ls -lh "$OUT_DIR/LoopSpeaker.apk"
+echo "[build-app] done → $OUT_DIR/LoopDLSpeaker.apk"
+ls -lh "$OUT_DIR/LoopDLSpeaker.apk"

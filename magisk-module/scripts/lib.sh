@@ -9,8 +9,8 @@ loop_log() { echo "$(date '+%H:%M:%S') $*" >> "$LOG"; log -t LoopSpk "$*"; }
 loop_load_config() { [ -f "$CONFIG" ] && . "$CONFIG"; }
 
 # fire a cue/command into the helper app
-loop_app() { am broadcast -a co.loop.speaker.CMD --es cmd "$1" ${2:+--es arg "$2"} \
-  -n co.loop.speaker/.CmdReceiver >/dev/null 2>&1; }
+loop_app() { am broadcast -a io.github.haohowareyou.loopdl.CMD --es cmd "$1" ${2:+--es arg "$2"} \
+  -n io.github.haohowareyou.loopdl/.CmdReceiver >/dev/null 2>&1; }
 
 # /system/bin/svc (and settings/cmd) are `app_process ... Svc`, which needs the FULL
 # (post-APEX) BOOTCLASSPATH. Early-spawned Magisk boot-script processes (service.sh and

@@ -1,4 +1,4 @@
-package co.loop.speaker
+package io.github.haohowareyou.loopdl
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice

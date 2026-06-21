@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "LoopSpeaker"
+rootProject.name = "LoopDLSpeaker"
 include(":app")
