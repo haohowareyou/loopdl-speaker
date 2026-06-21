@@ -236,6 +236,12 @@ after a dead period).
 before the 15-minute idle auto-off fires. Any button press cancels it and resets the idle
 timer.
 
+**Boot and shutdown sounds:** this project ships none. Android plays
+`/system/media/bootaudio.mp3` and `/system/media/shutaudio.mp3` if they exist, and your
+device's own stock files are used as-is. If you want custom ones, drop your own MP3s at
+those paths through the module's `system/media/` overlay. Do not redistribute the vendor's
+stock audio; use your own.
+
 ---
 
 ## Full-Phone mode: launcher and quick toggles
