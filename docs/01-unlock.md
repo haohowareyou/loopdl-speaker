@@ -87,32 +87,38 @@ Run all mtkclient commands as:
 
 ### 1. Back up critical partitions (do this before unlocking)
 
-Dump your unit's partitions over the BROM before you change anything. Connect in PRELOADER
-mode (power off, plug USB, no buttons) for each command. mtkclient reads a partition with
-`mtk.py r <partition> <outfile>`.
+> **This is your only point of no return for backups.** The next step wipes the device,
+> and a bad unlock can soft-brick it. Once you unlock, you can never re-capture this unit's
+> factory-pristine, locked state. Do this first, and confirm the dumps are non-empty before
+> you continue.
 
-At minimum, back up the partitions you might need to restore:
-
-```bash
-mkdir -p ../loop-backup/partitions-mine
-cd ~/path/to/mtkclient
-for P in init_boot_a seccfg vbmeta_a; do
-  ./venv/bin/python mtk.py r $P ../loop-backup/partitions-mine/$P.img
-done
-```
-
-For full brick-insurance also dump your **per-unit identity partitions**. These are unique
-to your device (serial, RF calibration, eSIM state) and cannot be recovered from anyone
-else's unit:
+Connect in PRELOADER mode (power off, plug USB, no buttons). Replace `~/path/to/mtkclient`
+with the directory you cloned mtkclient into. Run both from the repo root; they write into
+`../loop-backup/` (a sibling of the repo, gitignored so backups are never published):
 
 ```bash
-for P in nvram protect1 protect2 persist nvdata nvcfg frp; do
-  ./venv/bin/python mtk.py r $P ../loop-backup/partitions-mine/$P.img
-done
+# 1) Per-unit identity partitions: UNIQUE to this device (serial, RF, lock, secure state),
+#    irreplaceable, cannot come from any other unit.  -> ../loop-backup/identity/
+tools/run-partition-backup.sh ~/path/to/mtkclient
+
+# 2) Generic stock firmware (both slots): your un-root / re-lock / reflash baseline.
+#    -> ../loop-backup/firmware-stock/
+tools/capture-unrooted-baseline.sh ~/path/to/mtkclient
 ```
 
-Keep this folder safe and off the device. [`docs/recovery.md`](recovery.md) uses these
-images to write partitions back if anything goes wrong.
+If mtkclient hangs at "Uploading stage 2", you connected in BROM mode, not PRELOADER:
+unplug, wait a few seconds, and replug with no buttons held.
+
+Then confirm every dump actually landed and is non-empty before going further:
+
+```bash
+ls -lh ../loop-backup/identity/*.img ../loop-backup/firmware-stock/*.img
+```
+
+The firmware dump (step 2) is generic and cross-unit, so you can take it from this unit
+before unlocking or from any other factory unit; the identity dump (step 1) must come from
+this unit. [`docs/recovery.md`](recovery.md) uses these images to write partitions back if
+anything goes wrong.
 
 ### 2. Unlock seccfg
 

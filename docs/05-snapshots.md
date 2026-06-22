@@ -6,7 +6,7 @@ and a brick is recoverable because the MediaTek BROM stays open (see `docs/01-un
 | Stage | What it is | How it's captured |
 |-------|-----------|-------------------|
 | 1 - **unrooted** | Pristine factory firmware, locked | Generic firmware dump from a factory unit (`tools/capture-unrooted-baseline.sh`) |
-| 2 - **rooted** | Unlocked + Magisk + A2DP-sink, pre-debloat | Logical snapshot + per-unit partition dump (already captured) |
+| 2 - **rooted** | Unlocked + Magisk + A2DP-sink, pre-debloat | Logical snapshot + per-unit partition dump (`tools/run-partition-backup.sh`) |
 | 3 - **speaker-mode** | Speaker module installed + configured | Logical snapshot (`tools/snapshot-state.sh`) |
 
 Each snapshot has two halves:
@@ -22,10 +22,10 @@ Captured snapshots live outside the repo (gitignored) because they contain devic
 
 ## What is already captured (this unit)
 
-- `loop-backup/partitions-2026-06-09/`: this unit's **identity partitions**
-  (nvram/protect1/protect2/persist/nvdata/nvcfg/seccfg/frp/misc/para/gpt). Irreplaceable, unique
-  per device. The generic firmware was not cleanly dumped here (xflash desynced); that's what
-  stage 1 below fills in.
+- `loop-backup/identity/`: this unit's **identity partitions**
+  (nvram/protect1/protect2/persist/nvdata/nvcfg/seccfg/frp/misc/para/gpt), captured with
+  `tools/run-partition-backup.sh`. Irreplaceable, unique per device. The generic firmware is
+  captured separately into `loop-backup/firmware-stock/` (stage 1 below).
 - `loop-backup/snapshot-2026-06-09-rooted-baseline/`: **stage 2** logical snapshot.
 - `loop-backup/snapshot-<date>-speaker-mode/`: **stage 3** logical snapshot.
 
@@ -40,11 +40,11 @@ unit you later restore onto, and confirm they match before relying on a cross-un
 ```bash
 # New unit: power OFF, plug USB in PRELOADER mode (no buttons).
 tools/capture-unrooted-baseline.sh ../mtkclient
-# -> ../loop-backup/stage1-unrooted-<date>/  (boot/init_boot/vbmeta/lk/tee/... + gpt)
+# -> ../loop-backup/firmware-stock/  (boot/init_boot/vbmeta/lk/tee/... + gpt)
 ```
 
 Identity partitions are NOT taken from another unit; they're unique per device. Each unit's
-own identity partitions are dumped separately (`run-partition-backup.sh`).
+own identity partitions are dumped separately (`tools/run-partition-backup.sh`).
 
 ## Capturing / restoring the logical state
 

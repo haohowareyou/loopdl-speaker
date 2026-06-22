@@ -10,9 +10,9 @@ as the ramdisk partition (standard on Android 13+ A/B devices with GKI kernels).
 
 - Magisk APK (v30.x tested; download from [github.com/topjohnwu/Magisk](https://github.com/topjohnwu/Magisk/releases))
 - The stock `init_boot_a.img` for your firmware version. You already dumped this in
-  [step 1](01-unlock.md) (`../loop-backup/partitions-mine/init_boot_a.img`); use that copy.
-  (A `dd` dump over `su` also works, but only once you are already rooted, so it is not an
-  option at this point.)
+  [step 1](01-unlock.md): it is in the firmware-stock backup
+  (`../loop-backup/firmware-stock/init_boot_a.img`); use that copy. (A `dd` dump over `su`
+  also works, but only once you are already rooted, so it is not an option at this point.)
 - `adb` and `fastboot` on your Mac/PC
 
 ---
@@ -75,6 +75,8 @@ uid=0(root) gid=0(root) groups=0(root) context=u:r:magisk:s0
 ```
 
 The Magisk app should also show "Installed" with your version number.
+
+Next: [Debloat](03-debloat.md), then install the speaker module.
 
 ---
 

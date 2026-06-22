@@ -55,7 +55,7 @@ To remove Magisk without touching anything else:
 adb reboot bootloader
 
 # Flash the original unpatched init_boot:
-fastboot flash init_boot /path/to/stock/init_boot_a.img
+fastboot flash init_boot ../loop-backup/firmware-stock/init_boot_a.img
 fastboot reboot
 ```
 
@@ -67,7 +67,7 @@ unlocked state). You can re-root at any time by repeating [step 2](02-root.md).
 ## Layer 4: Restore individual partitions via mtkclient
 
 Use this when you need to recover a specific partition (e.g. `seccfg`, `vbmeta`,
-`init_boot`) from the raw backup in `loop-backup/partitions-2026-06-09/`.
+`init_boot`) from the raw backup in `loop-backup/identity/`.
 
 **Device must be in PRELOADER mode** (power off, plug USB - **NO buttons held**; see
 [docs/01-unlock.md](01-unlock.md) for the explanation of why this matters).
@@ -77,14 +77,14 @@ cd ~/path/to/mtkclient
 
 # Restore a single partition:
 ./venv/bin/python mtk.py w <partition_name> \
-    ../loop-backup/partitions-2026-06-09/<partition_name>.img
+    ../loop-backup/identity/<partition_name>.img
 ```
 
 For example, to restore `seccfg`:
 
 ```bash
 ./venv/bin/python mtk.py w seccfg \
-    ../loop-backup/partitions-2026-06-09/seccfg.img
+    ../loop-backup/identity/seccfg.img
 ```
 
 ### Over-read caveat
@@ -99,7 +99,7 @@ truncate to the real size from the GPT before writing:
 # 2. Truncate:
 head -c <true_size_bytes> seccfg.img > seccfg.trunc.img
 # 3. Flash the truncated image:
-./venv/bin/python mtk.py w seccfg ../loop-backup/partitions-2026-06-09/seccfg.trunc.img
+./venv/bin/python mtk.py w seccfg ../loop-backup/identity/seccfg.trunc.img
 ```
 
 `nvdata.img` and `nvcfg.img` already have correct geometry and can be restored
@@ -112,7 +112,7 @@ To lock the bootloader and remove root:
 ```bash
 # Flash stock init_boot first (removes Magisk):
 ./venv/bin/python mtk.py w init_boot_a \
-    /path/to/stock-firmware/init_boot_a.img
+    ../loop-backup/firmware-stock/init_boot_a.img
 
 # Then re-lock seccfg:
 ./venv/bin/python mtk.py da seccfg lock

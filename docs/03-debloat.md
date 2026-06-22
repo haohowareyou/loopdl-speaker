@@ -146,3 +146,5 @@ If you accidentally disable something essential, use the snapshot's
 
 This re-enables every package that was enabled at the time of the snapshot and
 verifies the result. See [docs/recovery.md](recovery.md) for the full recovery ladder.
+
+Next: [Install the speaker module](04-speaker-mode.md).

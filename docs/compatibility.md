@@ -7,7 +7,7 @@ This project was developed and validated on an early unit of the **rainx LoopDL*
 - SoC: MediaTek MT6877V (Dimensity 900)
 - Android: 15
 - A/B partition layout with GKI (`init_boot` ramdisk, not `boot`)
-- Bluetooth device name during development: "Loop A" (project config default)
+- Bluetooth device name (config default): "Loop A"
 
 ## BROM authentication: check yours before trusting the unlock
 

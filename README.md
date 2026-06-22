@@ -36,6 +36,9 @@ Read this before you start. Some of what follows cannot be undone:
   unauthenticated, meaning `SLA`, `SBC`, and `DAA` all read `False`. Run `mtk printgpt`
   and check first; if any reads `True`, stop. The procedure here will not work on your
   unit and pushing ahead risks leaving it unbootable.
+- **Back up before you start.** Dump this unit's partitions while it still works, before
+  the destructive unlock; it is the only thing that makes recovery possible. See step 1 of
+  [`docs/01-unlock.md`](docs/01-unlock.md).
 
 What the host computer needs (the machine you run this from):
 
@@ -93,7 +96,8 @@ Android shell + priv-app + native daemon; only the unlock is unit-sensitive.
 | `tools/build-app.sh` | Build the helper APK (`io.github.haohowareyou.loopdl`) |
 | `tools/snapshot-state.sh` | Capture a logical-state snapshot (packages/settings/props) |
 | `tools/restore-state.sh` | Restore package enable/disable layout from a snapshot |
-| `tools/capture-unrooted-baseline.sh` | Dump pristine firmware from a new factory unit (stage 1) |
+| `tools/run-partition-backup.sh` | Dump this unit's per-unit identity partitions before unlocking |
+| `tools/capture-unrooted-baseline.sh` | Dump pristine stock firmware (the pre-unlock baseline) |
 | `tools/loop-debloat.sh` | Manage the 3 rainx permanent-removes: `status` / `remove` / `restore` |
 | `tools/apply-lawnchair-layout.sh` | Set the Lawnchair dock to Firefox / Camera / Settings / Play Store |
 
