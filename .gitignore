@@ -18,6 +18,9 @@ stage1-unrooted-*/
 stock-firmware/
 staging/
 bootanimation.zip
+# Boot/shutdown audio: vendor-copyrighted stock files kept locally for personal
+# builds, never published. Replicators supply their own (see docs/04-speaker-mode.md).
+magisk-module/system/media/
 
 # ── Signing keys / secrets ──
 *.keystore
