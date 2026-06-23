@@ -7,7 +7,7 @@ This project was developed and validated on an early unit of the **rainx LoopDL*
 - SoC: MediaTek MT6877V (Dimensity 900)
 - Android: 15
 - A/B partition layout with GKI (`init_boot` ramdisk, not `boot`)
-- Bluetooth device name (config default): "Loop A"
+- Bluetooth device name (config default): "theloop"
 
 ## BROM authentication: check yours before trusting the unlock
 
@@ -147,8 +147,8 @@ Confirmed on the validated unit (MT6877, Android 15):
 - Idle screen-off and power-off via root IPC.
 - A2DP audio, AVRCP transport, volume sync; earcons at ~15%; spoken battery % at
   `CUE_VOLUME_PCT` (30).
-- Button gestures: vol tap/double-tap/hold-ramp, power tap/hold, both-volumes pairing,
-  Power+Vol-Down mode switch.
+- Button gestures: vol tap/hold-ramp, power 1/2/3-tap (play-pause/next/prev), power hold
+  (shutdown), both-volumes pairing, Power+Vol-Down mode switch.
 - Two-stage auto-sleep (5 min screen-off, 15 min power-off); idle pre-off warning.
 - DND (alarms-only) in Dumb; lifted on Full.
 - Low-battery earcons at 20%/10%; graceful shutdown at ~5%.

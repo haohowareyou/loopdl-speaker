@@ -1,0 +1,19 @@
+# Applied by Magisk early in post-fs-data, in its own privileged boot context. This is the
+# reliable way to set these props on the MT6877 LoopDL: they are defined-but-valueless,
+# exact-typed (bluetooth_config_prop) props that the confined Magisk su domain cannot
+# materialise from a shell at runtime (resetprop creates a node getprop can't see). Magisk's
+# system.prop path sets them so getprop AND the BT stack see them at init.
+#
+# A2DP role: pure SINK. The ROM ships source-only; we enable the sink role and DISABLE the
+# source role. Leaving source enabled too (e.g. via the MTK a2dp_src_sink_both_enable
+# switch) makes the device also try to initiate an outgoing A2DP *source* connection to the
+# phone, colliding with the phone's incoming source link and tearing the connection down
+# (observed as connect-then-instant-disconnect). Sink-only = stable speaker.
+bluetooth.profile.a2dp.sink.enabled=true
+bluetooth.profile.a2dp.source.enabled=false
+# Advertised Bluetooth name. The stack derives the default from ro.product.model ("theloop")
+# and re-applies it over secure/bluetooth_name on every enable, so the durable override is a
+# property read at BT stack init. This ROM has NO persist.bluetooth.name in property_contexts;
+# the defined lever is bluetooth.device.default_name (bluetooth_config_prop, exact string) --
+# set here via system.prop because resetprop cannot materialise it from the confined su shell.
+bluetooth.device.default_name=theloop

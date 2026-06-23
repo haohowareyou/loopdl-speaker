@@ -71,21 +71,23 @@ the screen is off.
 
 | Gesture | Action |
 |---------|--------|
-| Vol+ tap | Volume up |
-| Vol− tap | Volume down |
-| Vol+ double-tap | Next track (AVRCP passthrough to source phone) |
-| Vol− double-tap | Previous track |
+| Vol+ tap | Volume up (applied instantly on release) |
+| Vol− tap | Volume down (instant) |
 | Vol+ / Vol− hold | Ramp volume (starts after `VOL_RAMP_DELAY_MS`, steps every `VOL_RAMP_INTERVAL_MS`); a "limit" tone plays at max/min |
-| Power tap (release) | Play / pause (AVRCP); also emits a soft "wake" earcon |
+| Power single tap | Play / pause (AVRCP); soft "wake" earcon. Fires after `POWER_MULTITAP_MS` (see below) |
+| Power double tap | Next track (AVRCP passthrough to source phone) |
+| Power triple tap | Previous track (fires instantly on the 3rd tap — no extra wait) |
 | **Power hold alone ~2.5 s** | **Shutdown** (power-off earcon, then powers off; no firmware power menu in Dumb mode) |
 | Both volumes held 3 s | Open pairing window (60 s) |
 | **Power + Vol− held 3 s** | Switch Dumb → Full |
 
-**Delayed-volume decode:** a single volume press is deferred by `VOL_DOUBLETAP_MS`
-(default 280 ms) before it acts, so the daemon can first tell apart a second tap of the
-same key (a double-tap for track skip). This adds ~280 ms of latency to a lone volume
-nudge but makes double-tap skip reliable. The both-volumes pairing combo is recognised
-instantly (no inter-key delay applied to combos).
+**Power multi-tap decode:** track control lives on the power button — 1 tap = play/pause,
+2 taps = next, 3 taps = previous. Because the daemon can't know another tap isn't coming, a
+single tap is deferred by `POWER_MULTITAP_MS` (default 280 ms) to count the sequence, so
+play/pause carries ~280 ms of latency. A triple-tap short-circuits: "previous" fires
+immediately on the 3rd release. Volume taps are **not** deferred — there is no volume
+double-tap gesture any more, so a lone volume tap acts instantly. The both-volumes pairing
+combo and the Power+Vol− mode combo are recognised by hold timers, independent of order.
 
 **Why Power + Vol−, not all three:** a long **Power + Vol-Up** hold triggers the MT6877
 PMIC hardware force-reboot *below the OS*; the daemon can't intercept it. The mode
@@ -110,6 +112,113 @@ If the **"Speaker Mode"** tile is not available to add, the helper app did not i
 priv-app (usually the module was built without the APK; see Install step 1). Until you
 rebuild and reflash, a full power-off then power-on always boots straight back to Dumb, so
 you are never stuck in Full.
+
+---
+
+## Troubleshooting buttons
+
+If gestures misbehave, **read the daemon log first** — it logs every key edge and every
+decoded action, and almost always tells you the answer directly:
+
+```bash
+adb shell su -c 'cat /data/adb/loop-speaker-mode/loopkeyd.log'
+```
+
+The log is truncated on each (re)launch. A healthy startup looks like:
+
+```
+loopkeyd: start (dry_run=0) pmtap=280ms pair=3000ms mode=3000ms poweroff=2500ms
+loopkeyd: matched "mtk-kpd" -> /dev/input/event1 ("mtk-kpd")
+loopkeyd: matched "mtk-pmic-keys" -> /dev/input/event0 ("mtk-pmic-keys")
+loopkeyd: grabbed 2 button device(s), power on "mtk-pmic-keys"
+loopkeyd: silence -> /dev/input/event2 ("mtk-tpd")
+loopkeyd: silenced 1 touchscreen device(s)
+```
+
+Then each gesture you perform logs its raw edges and decode, e.g.
+`key POWER down` / `key POWER up` / `power 2-tap: next` / `ACTION next`,
+or `key VOLDN down` / `vol tap VOLDN`.
+
+### Reading the startup line
+
+- **`matched "<name>"`** lines mean the daemon found its devices **by name** (pass 1).
+  This is the correct, expected path.
+- **`cap-match`** lines instead mean the by-name match found nothing and the daemon fell
+  back to a **capability scan** (pass 2). That is a red flag: it means `INPUT_KEYPAD` /
+  `INPUT_POWER` in the config don't match any device *name*. Check them:
+  ```bash
+  adb shell su -c 'grep INPUT_ /data/adb/loop-speaker-mode/config'
+  ```
+  They must hold device **names** (e.g. `mtk-kpd`, `mtk-pmic-keys`), **not** paths like
+  `/sys/class/input/event1`. If they hold paths, an old install wrote them wrong; fix with:
+  ```bash
+  adb shell su -c 'sed -i "s|^INPUT_KEYPAD=.*|INPUT_KEYPAD=\"mtk-kpd\"|;s|^INPUT_POWER=.*|INPUT_POWER=\"mtk-pmic-keys\"|" /data/adb/loop-speaker-mode/config'
+  ```
+  (or set them empty `""` to re-trigger auto-detect on the next install).
+
+### Confirm the hardware with a raw capture
+
+To prove the buttons themselves emit events (vs. a daemon decode problem), watch the
+kernel events directly. The daemon **grabs** the devices exclusively, so first stop it or
+run it in `--dry-run` (which does not grab), then:
+
+```bash
+adb shell su -c 'getevent -lt'   # all input devices; press each button and watch
+```
+
+On this LoopDL the topology is split across **two** devices, which is *why* the daemon
+keeps a global key-state and why every fd must be non-blocking:
+
+- `mtk-pmic-keys` → **Vol-Up + Power**
+- `mtk-kpd` → **Vol-Down only**
+- `mtk-tpd` → touchscreen (grabbed-and-dropped so a tap-wake can't light the screen)
+
+So **"Vol-Down dead but Vol-Up works"** is the signature of the daemon servicing only the
+first device — historically caused by a blocking fd starving the epoll loop (see below).
+
+### Dry-run mode (detect/log only, no grab, no actions)
+
+```bash
+adb shell su -c '/data/adb/modules/loop-speaker-mode/system/bin/loopkeyd --dry-run'
+```
+
+It logs gesture detection to stdout without grabbing devices or emitting actions — useful
+to confirm decode logic against live presses while the normal daemon is stopped.
+
+### Restarting the daemon after a code/config change
+
+The supervisor (`loopkeyd.sh`) relaunches the daemon within ~2 s of it exiting, but **only
+while `state == dumb`**. An interactive `su` shell runs in a confined SELinux domain and
+**cannot reliably signal the daemon** (`kill` returns `Operation not permitted`) or write
+the IPC trigger files. The reliable ways to pick up a new binary/config are:
+
+- **Reboot** (always works; cold-boot returns to Dumb).
+- `pkill -f loop-speaker-mode/system/bin/loopkeyd` as root — the supervisor respawns it.
+  (May be denied depending on domain; reboot is the fallback.)
+
+A config edit alone (no binary change) is applied by re-running the mode script:
+`sh /data/adb/loop-speaker-mode/scripts/loop-mode dumb`.
+
+### Known pitfalls (post-mortem)
+
+Two coupled bugs once made every gesture except Power and Vol-Up dead. Both are fixed; the
+mechanisms are recorded here because they were non-obvious:
+
+1. **Install stored device *path* instead of *name*.** `customize.sh` used `grep -l`
+   (returns the matching file path) and wrote that into `INPUT_KEYPAD`/`INPUT_POWER`, but
+   the daemon matches by **name** (`strstr`). Pass-1 by-name detection therefore always
+   failed and silently fell back to the capability scan. Fix: read the name *out* of the
+   matched file and overwrite the whole config line on every (re)install.
+2. **The fallback opened fds blocking.** The main loop drains each device with
+   `while (read()==sizeof(ev))`. On a **blocking** fd that `read()` waits for the next
+   event instead of returning `EAGAIN`, so the loop never returns to `epoll` — it camps on
+   the first device that fired and starves the *other* button device **and every gesture
+   timerfd**. Every input fd MUST be opened `O_RDONLY | O_NONBLOCK`. Pass 1 did; the pass-2
+   fallback originally did not.
+
+The lesson baked into the code: both discovery passes open fds with identical flags, and
+the startup log distinguishes `matched` (by-name, good) from `cap-match` (fallback) so the
+wrong path is visible at a glance.
 
 ---
 
@@ -156,7 +265,7 @@ adb shell su -c 'sed -i "s/^DEVICE_NAME=.*/DEVICE_NAME=\"Patio\"/" /data/adb/loo
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `DEVICE_NAME` | `"Loop A"` | Bluetooth name advertised in Dumb mode |
+| `DEVICE_NAME` | `"theloop"` | Bluetooth name advertised in Dumb mode |
 | `KEEP_DATA` | `0` | Set to `1` to leave cellular data ON in Dumb mode |
 | `KEEP_WIFI` | `0` | Set to `1` to leave WiFi ON in Dumb mode |
 | `PAIR_INITIAL` | `60` | Pairing window at boot (seconds) |
@@ -168,8 +277,8 @@ adb shell su -c 'sed -i "s/^DEVICE_NAME=.*/DEVICE_NAME=\"Patio\"/" /data/adb/loo
 | `A2DP_SINK_PROP` | `"bluetooth.profile.a2dp.sink.enabled"` | Prop name for A2DP sink (do not change) |
 | `GESTURE_PAIR_HOLD_MS` | `3000` | Hold both volumes this long to open pairing window (ms) |
 | `GESTURE_MODE_HOLD_MS` | `3000` | Hold Power+Vol− this long to switch Dumb→Full (ms) |
-| `POWER_SHUTDOWN_MS` | `2500` | Hold power alone this long to shut down (shorter = play/pause tap) (ms) |
-| `VOL_DOUBLETAP_MS` | `280` | Same volume key tapped twice within this window = track skip (ms); also the delayed-volume decode delay |
+| `POWER_SHUTDOWN_MS` | `2500` | Hold power alone this long to shut down (shorter = a tap) (ms) |
+| `POWER_MULTITAP_MS` | `280` | Max gap between power taps when counting the sequence: 1 = play/pause, 2 = next, 3 = previous (ms). Also the play/pause latency, since 1-tap must wait this long to rule out a 2nd tap |
 | `VOL_RAMP_DELAY_MS` | `500` | Hold a volume key this long before it starts ramping (ms) |
 | `VOL_RAMP_INTERVAL_MS` | `260` | While held past the ramp delay, nudge volume every this many ms |
 | `GRAB_TOUCH` | `1` | `1` = silence/grab the touchscreen in Dumb mode so it can't wake the screen |

@@ -69,8 +69,15 @@ while true; do
     fi
     if [ -f "$APPF/req_poweroff" ]; then
       rm -f "$APPF/req_poweroff"
-      loop_log "ipc: idle poweroff"
-      loop_fix_bcp; /system/bin/svc power shutdown
+      # On a charger, never full-shutdown on idle: a plugged-in speaker should stay
+      # reachable, just sleep (screen already blanked at stage 1). Only power off when
+      # running on battery. A deliberate power-button-hold (req_shutdown) still shuts down.
+      if dumpsys battery 2>/dev/null | grep -qE '(AC|USB|Wireless|Dock) powered: true'; then
+        loop_log "ipc: idle poweroff suppressed (charging)"
+      else
+        loop_log "ipc: idle poweroff"
+        loop_fix_bcp; /system/bin/svc power shutdown
+      fi
     fi
   fi
 

@@ -1,8 +1,14 @@
 #!/system/bin/sh
 . "$MODPATH/scripts/lib.sh" 2>/dev/null || . /data/adb/loop-speaker-mode/scripts/lib.sh
 loop_load_config
-resetprop "${A2DP_SINK_PROP:-bluetooth.profile.a2dp.sink.enabled}" true
-resetprop bluetooth.profile.a2dp.source.enabled false
+# -n (write directly to the property area, no property_service / SELinux context check):
+# the A2DP *sink* prop is not defined in every ROM's property_contexts (the MT6877 LoopDL
+# only ships the *source* prop). Plain resetprop cannot CREATE an undefined prop there
+# (no context -> denied) so the sink silently stays unset and the stack never brings the
+# sink profile up. -n creates it; for already-defined props the difference is moot. These
+# profile props are read once at BT stack init, so skipping change-triggers is fine.
+resetprop -n "${A2DP_SINK_PROP:-bluetooth.profile.a2dp.sink.enabled}" true
+resetprop -n bluetooth.profile.a2dp.source.enabled false
 # AVRCP role: a sink speaker is the Controller (CT) -- it SENDS play/pause/next/prev to
 # the phone, and must NOT run the Target (TG) role, which is the phone's role. A sink
 # stuck on TG cannot send transport commands AND fails absolute-volume negotiation
