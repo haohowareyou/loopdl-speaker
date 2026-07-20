@@ -29,6 +29,8 @@ import android.util.Log
  *   prev           - AVRCP previous track
  *   battery        - announce battery %
  *   say <text>     - speak arbitrary text via TTS
+ *   eq <preset>    - switch output EQ preset (flat|warm|bass|vocal); no arg = compiled default
+ *   eq_band <i:mB> - raw single-band override (millibels) for on-device tuning
  *   ping           - no-op health check (just logs)
  */
 class LoopService : Service() {
@@ -51,6 +53,7 @@ class LoopService : Service() {
     private lateinit var tick: Tick
     private lateinit var battery: BatteryWatch
     private lateinit var panGuard: PanGuard
+    private lateinit var eq: Eq
     private val keepAlive = AudioKeepAlive()
     private var ready = false
     private var dumbMode = false
@@ -237,9 +240,13 @@ class LoopService : Service() {
         tick     = Tick(this, { touchAmp() }, { tones.edge() })
         battery  = BatteryWatch(this, tones)
         panGuard = PanGuard(this)   // block BT-PAN (phone's data over Bluetooth) -- audio only
+        eq       = Eq()             // global output EQ on the A2DP-sink stream
 
         avrcp.init()
         cues.init()
+        // Shape the output: attach the EQ/BassBoost to the global mix. Fails safe (audio left
+        // flat) if this ROM bypasses session-0 effects on the sink path -- see Eq.kt.
+        eq.init(Config.EQ_PRESET)
 
         // Bind the A2DP-Sink profile proxy (id 11), retrying past the boot BT bounce, so
         // confirmConnected()/a2dpState() can read the real per-device connection state.
@@ -319,6 +326,9 @@ class LoopService : Service() {
             "battery"    -> cues.battery()
             "say"        -> arg?.let { cues.say(it) }
 
+            "eq"         -> eq.apply(arg ?: Config.EQ_PRESET)
+            "eq_band"    -> arg?.let { eq.setBand(it) }
+
             else         -> Log.i(TAG, "unknown cmd=$cmd")
         }
     }
@@ -338,6 +348,7 @@ class LoopService : Service() {
             panGuard.stop()
             tick.stop()
             volume.stop()
+            eq.release()
             cues.shutdown()
         }
         Log.i(TAG, "service destroy")

@@ -19,6 +19,8 @@ object Config {
     var CUE_VOLUME_PCT: Int = 30
     var IDLE_SLEEP_MIN: Int = 5
     var IDLE_OFF_MIN: Int = 15
+    // Output EQ preset: flat|warm|bass|vocal. "warm" = gently bassy, the shipped default.
+    var EQ_PRESET: String = "warm"
 
     fun load() {
         val f = File(PATH)
@@ -37,6 +39,7 @@ object Config {
                     "CUE_VOLUME_PCT"   -> CUE_VOLUME_PCT   = value.toIntOrNull() ?: CUE_VOLUME_PCT
                     "IDLE_SLEEP_MIN"   -> IDLE_SLEEP_MIN   = value.toIntOrNull() ?: IDLE_SLEEP_MIN
                     "IDLE_OFF_MIN"     -> IDLE_OFF_MIN     = value.toIntOrNull() ?: IDLE_OFF_MIN
+                    "EQ_PRESET"        -> EQ_PRESET        = value
                 }
             }
             Log.i(TAG, "config loaded: pair_initial=$PAIR_INITIAL pair_retrigger=$PAIR_RETRIGGER " +
