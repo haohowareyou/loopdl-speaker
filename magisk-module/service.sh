@@ -35,6 +35,13 @@ done
 # spoken cues (it owns no a2dpReceiver while dead). loop-mode dumb then starts it fresh
 # AFTER the stack is settled, so it binds the now-available AvrcpControllerService and
 # announces exactly one clean "Connected" instead of the old pair-twice chatter.
+# Advertised Bluetooth name: override system.prop's placeholder with the per-unit config value
+# now -- late_start (system.prop already materialised the prop) and before the BT bounce below,
+# so the adapter comes up advertising DEVICE_NAME. resetprop works here just like it does for the
+# AVRCP props right after. (post-fs-data is too early to set this bluetooth_config_prop.)
+loop_load_config
+[ -n "$DEVICE_NAME" ] && resetprop -n bluetooth.device.default_name "$DEVICE_NAME"
+
 am force-stop io.github.haohowareyou.loopdl
 resetprop bluetooth.profile.avrcp.controller.enabled true
 resetprop bluetooth.profile.avrcp.target.enabled false

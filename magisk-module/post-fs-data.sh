@@ -19,5 +19,8 @@ resetprop bluetooth.profile.avrcp.target.enabled false
 resetprop persist.bluetooth.disableabsvol false
 # Advertised Bluetooth name. The stack derives the default from ro.product.model
 # ("theloop") and re-applies it over secure/bluetooth_name on every enable, so the only
-# durable override is this property (read once at BT stack init).
+# durable override is a property read once at BT stack init.
 [ -n "$DEVICE_NAME" ] && resetprop persist.bluetooth.name "$DEVICE_NAME"
+# NOTE: bluetooth.device.default_name (the adapter name) is NOT set here -- at post-fs-data a
+# shell resetprop can't materialise that bluetooth_config_prop. system.prop materialises it and
+# service.sh overrides the value per-unit from DEVICE_NAME (after system.prop, before the BT bounce).
