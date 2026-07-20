@@ -1,7 +1,10 @@
 package io.github.haohowareyou.loopdl
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioManager
+import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -22,12 +25,16 @@ import java.io.File
  *   - A2DP connect/disconnect broadcasts (LoopService)
  *   - Daemon button broadcasts
  *
- * Never fires while AudioManager.isMusicActive() is true.
+ * Never fires while AudioManager.isMusicActive() is true. When [stayOnCharging] is set,
+ * also never fires while the device is on external power (AC/USB/wireless) -- for a
+ * permanent desk/outdoor setup that should stay up as long as it's plugged in. Unplugging
+ * restarts the idle countdown from zero.
  */
 class IdleSleep(
     val ctx: Context,
     val sleepMin: Int,
     val offMin: Int,
+    val stayOnCharging: Boolean = false,
     val onPreOff: () -> Unit = {},
 ) {
     private val h = Handler(Looper.getMainLooper())
@@ -43,6 +50,12 @@ class IdleSleep(
         preOffWarned = false
     }
 
+    /** True while on external power (AC/USB/wireless), regardless of battery %. */
+    private fun onExternalPower(): Boolean {
+        val i = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return false
+        return i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+    }
+
     /** Drop a trigger file in filesDir for the root IPC poller (loop-ipc.sh) to execute. */
     private fun signalRoot(name: String) {
         try {
@@ -56,7 +69,7 @@ class IdleSleep(
         if (running) return
         running = true
         poke()
-        Log.i("LoopSpk", "idle-sleep started sleep=${sleepMin}m off=${offMin}m")
+        Log.i("LoopSpk", "idle-sleep started sleep=${sleepMin}m off=${offMin}m stayOnCharging=$stayOnCharging")
         h.post(ticker)
     }
 
@@ -70,8 +83,8 @@ class IdleSleep(
         override fun run() {
             if (!running) return
             val idleMin = (SystemClock.elapsedRealtime() - last) / 60_000
-            if (am.isMusicActive) {
-                // Music is playing -- reset idle clock and stay awake
+            if (am.isMusicActive || (stayOnCharging && onExternalPower())) {
+                // Music playing, or plugged in with stay-on-charging -- reset clock, stay awake
                 poke()
             } else {
                 when {

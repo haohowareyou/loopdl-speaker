@@ -5,6 +5,7 @@ PAIR_INITIAL=60
 PAIR_RETRIGGER=60
 IDLE_SLEEP_MIN=5
 IDLE_OFF_MIN=15
+STAY_ON_WHILE_CHARGING=1      # 1 = never idle-sleep/off while plugged in (app-compiled default; app can't read this file)
 INPUT_KEYPAD=""           # auto-detected at install if empty
 INPUT_POWER=""            # auto-detected at install if empty
 A2DP_SINK_PROP="bluetooth.profile.a2dp.sink.enabled"

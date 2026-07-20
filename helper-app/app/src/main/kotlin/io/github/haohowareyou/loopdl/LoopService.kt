@@ -232,7 +232,8 @@ class LoopService : Service() {
         pairing  = Pairing(this, tones)
         reconnect = Reconnect(this)
         // onPreOff: warn ~1 min before the idle auto-off so a button tap can keep it alive.
-        idleSleep = IdleSleep(this, Config.IDLE_SLEEP_MIN, Config.IDLE_OFF_MIN) { tones.idleWarn() }
+        idleSleep = IdleSleep(this, Config.IDLE_SLEEP_MIN, Config.IDLE_OFF_MIN,
+            Config.STAY_ON_WHILE_CHARGING) { tones.idleWarn() }
         volume   = Volume(this, avrcp)
         // Volume press feedback also warms the amp so the tick (and any nearby cue) is
         // audible from a cold/standby amp -- same "is it on?" reassurance as the power chime.

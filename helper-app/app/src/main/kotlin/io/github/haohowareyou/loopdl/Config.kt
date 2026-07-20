@@ -19,6 +19,9 @@ object Config {
     var CUE_VOLUME_PCT: Int = 30
     var IDLE_SLEEP_MIN: Int = 5
     var IDLE_OFF_MIN: Int = 15
+    // Stay awake (no idle sleep/off) while on external power. Default on: a plugged-in
+    // unit is a permanent desk/outdoor setup. Unplugging restarts the idle countdown.
+    var STAY_ON_WHILE_CHARGING: Boolean = true
     // Output EQ preset: flat|warm|bass|vocal. "bass" = stronger low end (BassBoost 550),
     // the shipped default -- chosen by ear for outdoor/EDM use where there's no room to
     // reinforce the low end. "warm" is the gentler all-rounder.
@@ -41,6 +44,7 @@ object Config {
                     "CUE_VOLUME_PCT"   -> CUE_VOLUME_PCT   = value.toIntOrNull() ?: CUE_VOLUME_PCT
                     "IDLE_SLEEP_MIN"   -> IDLE_SLEEP_MIN   = value.toIntOrNull() ?: IDLE_SLEEP_MIN
                     "IDLE_OFF_MIN"     -> IDLE_OFF_MIN     = value.toIntOrNull() ?: IDLE_OFF_MIN
+                    "STAY_ON_WHILE_CHARGING" -> STAY_ON_WHILE_CHARGING = (value == "1" || value.equals("true", true))
                     "EQ_PRESET"        -> EQ_PRESET        = value
                 }
             }
