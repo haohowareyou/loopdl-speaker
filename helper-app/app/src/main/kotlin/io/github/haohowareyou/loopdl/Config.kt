@@ -19,8 +19,10 @@ object Config {
     var CUE_VOLUME_PCT: Int = 30
     var IDLE_SLEEP_MIN: Int = 5
     var IDLE_OFF_MIN: Int = 15
-    // Output EQ preset: flat|warm|bass|vocal. "warm" = gently bassy, the shipped default.
-    var EQ_PRESET: String = "warm"
+    // Output EQ preset: flat|warm|bass|vocal. "bass" = stronger low end (BassBoost 550),
+    // the shipped default -- chosen by ear for outdoor/EDM use where there's no room to
+    // reinforce the low end. "warm" is the gentler all-rounder.
+    var EQ_PRESET: String = "bass"
 
     fun load() {
         val f = File(PATH)

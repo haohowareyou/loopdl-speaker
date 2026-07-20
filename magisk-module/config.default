@@ -16,9 +16,10 @@ VOL_RAMP_DELAY_MS=500        # hold a volume key this long before it starts ramp
 VOL_RAMP_INTERVAL_MS=260     # while held past the delay, nudge volume every this many ms (gradual)
 GRAB_TOUCH=1                 # 1 = silence (grab+drop) touchscreen in dumb mode (no screen wake)
 CUE_VOLUME_PCT=30
-# Output EQ preset baked into the helper app: flat|warm|bass|vocal. "warm" = gently bassy.
+# Output EQ preset baked into the helper app: flat|warm|bass|vocal. "bass" = stronger low
+# end (tuned for outdoor/EDM); "warm" is the gentler all-rounder.
 # NOTE: the app can't read this root-only file, so the effective default is compiled in
 # (Config.EQ_PRESET). To retune live with a unit on adb (no rebuild), broadcast:
 #   am broadcast -a io.github.haohowareyou.loopdl.CMD --es cmd eq      --es arg bass
 #   am broadcast -a io.github.haohowareyou.loopdl.CMD --es cmd eq_band --es arg 0:300
-EQ_PRESET="warm"
+EQ_PRESET="bass"
